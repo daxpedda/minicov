@@ -140,6 +140,9 @@ extern "C" {
         SkipNameDataWrite: i32,
     ) -> i32;
     fn lprofGetVPDataReader() -> *mut VPDataReaderType;
+    fn __llvm_profile_get_num_counters(begin: *const u8, end: *const u8) -> u64;
+    fn __llvm_profile_begin_counters() -> *mut u8;
+    fn __llvm_profile_end_counters() -> *mut u8;
 }
 
 const INSTR_PROF_RAW_VERSION: u64 = 10;
@@ -319,5 +322,15 @@ pub fn reset_coverage() {
 
     unsafe {
         __llvm_profile_reset_counters();
+    }
+}
+
+/// Get the number of entries in the profile counters section.
+pub fn counters() -> u64 {
+    unsafe {
+        __llvm_profile_get_num_counters(
+            __llvm_profile_begin_counters(),
+            __llvm_profile_end_counters(),
+        )
     }
 }
