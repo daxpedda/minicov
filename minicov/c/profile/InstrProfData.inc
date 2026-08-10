@@ -78,6 +78,8 @@ INSTR_PROF_DATA(const uint64_t, llvm::Type::getInt64Ty(Ctx), FuncHash, \
                 ConstantInt::get(llvm::Type::getInt64Ty(Ctx), \
                 Inc->getHash()->getZExtValue()))
 INSTR_PROF_DATA(const IntPtrT, IntPtrTy, CounterPtr, RelativeCounterPtr)
+INSTR_PROF_DATA(const IntPtrT, IntPtrTy, UniformCounterPtr, \
+                RelativeUniformCounterPtr)
 INSTR_PROF_DATA(const IntPtrT, IntPtrTy, BitmapPtr, RelativeBitmapPtr)
 /* This is used to map function pointers for the indirect call targets to
  * function name hashes during the conversion from raw to merged profile
@@ -91,6 +93,10 @@ INSTR_PROF_DATA(const uint32_t, llvm::Type::getInt32Ty(Ctx), NumCounters, \
                 ConstantInt::get(llvm::Type::getInt32Ty(Ctx), NumCounters))
 INSTR_PROF_DATA(const uint16_t, Int16ArrayTy, NumValueSites[IPVK_Last+1], \
                 ConstantArray::get(Int16ArrayTy, Int16ArrayVals)) \
+INSTR_PROF_DATA(const uint16_t, llvm::Type::getInt16Ty(Ctx), \
+                OffloadDeviceWaveSize, \
+                ConstantInt::get(llvm::Type::getInt16Ty(Ctx), \
+                                 OffloadDeviceWaveSizeVal))
 INSTR_PROF_DATA(const uint32_t, llvm::Type::getInt32Ty(Ctx), NumBitmapBytes, \
                 ConstantInt::get(llvm::Type::getInt32Ty(Ctx), NumBitmapBytes))
 #undef INSTR_PROF_DATA
@@ -160,6 +166,12 @@ INSTR_PROF_RAW_HEADER(uint64_t, NumCounters, NumCounters)
 INSTR_PROF_RAW_HEADER(uint64_t, PaddingBytesAfterCounters, PaddingBytesAfterCounters)
 INSTR_PROF_RAW_HEADER(uint64_t, NumBitmapBytes, NumBitmapBytes)
 INSTR_PROF_RAW_HEADER(uint64_t, PaddingBytesAfterBitmapBytes, PaddingBytesAfterBitmapBytes)
+INSTR_PROF_RAW_HEADER(uint64_t, NumUniformCounters, NumUniformCounters)
+INSTR_PROF_RAW_HEADER(uint64_t, PaddingBytesAfterUniformCounters, PaddingBytesAfterUniformCounters)
+INSTR_PROF_RAW_HEADER(uint64_t, UniformCountersDelta,
+                      UniformCountersBegin ? (uintptr_t)UniformCountersBegin -
+                                                 (uintptr_t)DataBegin
+                                           : 0)
 INSTR_PROF_RAW_HEADER(uint64_t, NamesSize,  NamesSize)
 INSTR_PROF_RAW_HEADER(uint64_t, CountersDelta,
                       (uintptr_t)CountersBegin - (uintptr_t)DataBegin)
@@ -708,9 +720,9 @@ serializeValueProfDataFrom(ValueProfRecordClosure *Closure,
         (uint64_t)'f' << 16 | (uint64_t)'R' << 8 | (uint64_t)129
 
 /* Raw profile format version (start from 1). */
-#define INSTR_PROF_RAW_VERSION 10
+#define INSTR_PROF_RAW_VERSION 11
 /* Indexed profile format version (start from 1). */
-#define INSTR_PROF_INDEX_VERSION 12
+#define INSTR_PROF_INDEX_VERSION 14
 /* Coverage mapping format version (start from 0). */
 #define INSTR_PROF_COVMAP_VERSION 6
 
@@ -751,6 +763,7 @@ serializeValueProfDataFrom(ValueProfRecordClosure *Closure,
 #define INSTR_PROF_NAME_COMMON __llvm_prf_names
 #define INSTR_PROF_VNAME_COMMON __llvm_prf_vns
 #define INSTR_PROF_CNTS_COMMON __llvm_prf_cnts
+#define INSTR_PROF_UCNTS_COMMON __llvm_prf_ucnts
 #define INSTR_PROF_BITS_COMMON __llvm_prf_bits
 #define INSTR_PROF_VALS_COMMON __llvm_prf_vals
 #define INSTR_PROF_VNODES_COMMON __llvm_prf_vnds
@@ -767,6 +780,7 @@ serializeValueProfDataFrom(ValueProfRecordClosure *Closure,
 #define INSTR_PROF_NAME_COFF ".lprfn$M"
 #define INSTR_PROF_VNAME_COFF ".lprfvn$M"
 #define INSTR_PROF_CNTS_COFF ".lprfc$M"
+#define INSTR_PROF_UCNTS_COFF ".lprfuc$M"
 #define INSTR_PROF_BITS_COFF ".lprfb$M"
 #define INSTR_PROF_VALS_COFF ".lprfv$M"
 #define INSTR_PROF_VNODES_COFF ".lprfnd$M"

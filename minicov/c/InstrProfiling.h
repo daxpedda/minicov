@@ -281,10 +281,12 @@ uint64_t __llvm_profile_get_vtable_section_size(const VTableProfData *Begin,
  */
 int __llvm_profile_get_padding_sizes_for_counters(
     uint64_t DataSize, uint64_t CountersSize, uint64_t NumBitmapBytes,
-    uint64_t NamesSize, uint64_t VTableSize, uint64_t VNameSize,
-    uint64_t *PaddingBytesBeforeCounters, uint64_t *PaddingBytesAfterCounters,
-    uint64_t *PaddingBytesAfterBitmap, uint64_t *PaddingBytesAfterNames,
-    uint64_t *PaddingBytesAfterVTable, uint64_t *PaddingBytesAfterVNames);
+    uint64_t NumUniformCounters, uint64_t NamesSize, uint64_t VTableSize,
+    uint64_t VNameSize, uint64_t *PaddingBytesBeforeCounters,
+    uint64_t *PaddingBytesAfterCounters, uint64_t *PaddingBytesAfterBitmap,
+    uint64_t *PaddingBytesAfterUniformCounters,
+    uint64_t *PaddingBytesAfterNames, uint64_t *PaddingBytesAfterVTable,
+    uint64_t *PaddingBytesAfterVNames);
 
 /*!
  * \brief Set the flag that profile data has been dumped to the file.

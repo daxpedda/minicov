@@ -148,7 +148,7 @@ extern "C" {
     fn lprofGetLoadModuleSignature() -> u64;
 }
 
-const INSTR_PROF_RAW_VERSION: u64 = 10;
+const INSTR_PROF_RAW_VERSION: u64 = 11;
 const VARIANT_MASKS_ALL: u64 = 0xffffffff00000000;
 
 // On some target rustc will insert an artificial dependency on the

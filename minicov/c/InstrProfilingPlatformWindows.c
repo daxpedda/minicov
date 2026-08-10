@@ -41,7 +41,11 @@
 #pragma section(".lprfnd$Z", read, write)
 #endif
 
+/* Keep the sentinels aligned like the records emitted into .lprfd$M. Without
+ * this, Windows may insert a gap that is counted as a phantom data record. */
+COMPILER_RT_ALIGNAS(INSTR_PROF_DATA_ALIGNMENT)
 __llvm_profile_data COMPILER_RT_SECTION(".lprfd$A") DataStart = {0};
+COMPILER_RT_ALIGNAS(INSTR_PROF_DATA_ALIGNMENT)
 __llvm_profile_data COMPILER_RT_SECTION(".lprfd$Z") DataEnd = {0};
 
 const char COMPILER_RT_SECTION(".lprfn$A") NamesStart = '\0';
