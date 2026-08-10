@@ -7,7 +7,10 @@ fn main() {
     cfg.compiler("clang");
     cfg.flag("-nostdlibinc");
     cfg.flag("-fno-stack-protector");
+    cfg.flag("-fno-profile-generate");
+    cfg.flag("-fno-profile-use");
     cfg.flag("-fno-profile-instr-generate");
+    cfg.flag("-fno-profile-instr-use");
     cfg.flag("-fno-coverage-mapping");
     cfg.define("COMPILER_RT_HAS_ATOMICS", "1");
 
