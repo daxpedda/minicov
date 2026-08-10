@@ -13,7 +13,3 @@ edition = "2018"
 [features]
 default = ["alloc"]
 alloc = []
-
-[build-dependencies]
-cc = "1.0.77"
-walkdir = "2.3.2"

@@ -106,6 +106,8 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+mod profiler_runtime;
+
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
