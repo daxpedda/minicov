@@ -102,11 +102,12 @@
 #![no_std]
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
-#![feature(linkage)]
+#![cfg_attr(nightly, feature(linkage))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(nightly)]
 mod profiler_runtime;
 
 #[cfg(feature = "alloc")]
@@ -135,6 +136,7 @@ struct ProfDataWriter {
 // Opaque type for our purposes.
 enum VPDataReaderType {}
 
+#[cfg(nightly)]
 extern "C" {
     fn __llvm_profile_begin_counters() -> *const u8;
     fn __llvm_profile_end_counters() -> *const u8;
@@ -149,6 +151,44 @@ extern "C" {
     ) -> i32;
     fn lprofGetVPDataReader() -> *mut VPDataReaderType;
     fn lprofGetLoadModuleSignature() -> u64;
+}
+
+#[cfg(not(nightly))]
+unsafe fn __llvm_profile_begin_counters() -> *const u8 {
+    core::ptr::null()
+}
+#[cfg(not(nightly))]
+unsafe fn __llvm_profile_end_counters() -> *const u8 {
+    core::ptr::null()
+}
+#[cfg(not(nightly))]
+unsafe fn __llvm_profile_reset_counters() {}
+#[cfg(not(nightly))]
+unsafe fn __llvm_profile_merge_from_buffer(_: *const u8, _: u64) -> i32 {
+    0
+}
+#[cfg(not(nightly))]
+unsafe fn __llvm_profile_check_compatibility(_: *const u8, _: u64) -> i32 {
+    0
+}
+#[cfg(not(nightly))]
+unsafe fn __llvm_profile_get_version() -> u64 {
+    0
+}
+#[cfg(not(nightly))]
+#[allow(non_snake_case)]
+unsafe fn lprofWriteData(_: *mut ProfDataWriter, _: *mut VPDataReaderType, _: i32) -> i32 {
+    0
+}
+#[cfg(not(nightly))]
+#[allow(non_snake_case)]
+unsafe fn lprofGetVPDataReader() -> *mut VPDataReaderType {
+    core::ptr::null_mut()
+}
+#[cfg(not(nightly))]
+#[allow(non_snake_case)]
+unsafe fn lprofGetLoadModuleSignature() -> u64 {
+    0
 }
 
 const INSTR_PROF_RAW_VERSION: u64 = 11;

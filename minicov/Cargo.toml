@@ -13,3 +13,9 @@ edition = "2018"
 [features]
 default = ["alloc"]
 alloc = []
+
+[build-dependencies]
+rustversion = "1"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(nightly)'] }
