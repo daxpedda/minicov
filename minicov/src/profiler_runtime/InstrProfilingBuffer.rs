@@ -1,6 +1,7 @@
+use super::InstrProfilingMerge::ValueProfData;
+use super::InstrProfilingValue::ValueProfRecord;
+
 extern "C" {
-    pub type ValueProfData;
-    pub type ValueProfRecord;
     fn lprofBufferWriter(
         This: *mut ProfDataWriter,
         IOVecs: *mut ProfDataIOVec,

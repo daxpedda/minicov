@@ -102,6 +102,7 @@
 #![no_std]
 #![warn(missing_docs)]
 #![warn(rust_2018_idioms)]
+#![feature(linkage)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

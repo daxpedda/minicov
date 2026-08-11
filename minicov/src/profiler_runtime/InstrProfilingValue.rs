@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicPtr, Ordering};
+
 extern "C" {
     fn minicov_alloc_zeroed(Size: size_t, Alignment: size_t) -> *mut ::core::ffi::c_void;
     fn minicov_dealloc(Ptr: *mut ::core::ffi::c_void, Size: size_t, Alignment: size_t);
@@ -356,12 +358,14 @@ unsafe extern "C" fn allocateValueProfileCounters(
     if Mem.is_null() {
         return 0 as ::core::ffi::c_int;
     }
-    if !::core::intrinsics::atomic_cxchg_seqcst_seqcst(
-        &raw mut (*Data).0.Values,
-        ::core::ptr::null_mut::<::core::ffi::c_void>(),
-        Mem as IntPtrT,
-    )
-    .1
+    if AtomicPtr::from_ptr(&raw mut (*Data).0.Values)
+        .compare_exchange(
+            ::core::ptr::null_mut::<::core::ffi::c_void>(),
+            Mem as IntPtrT,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        )
+        .is_err()
     {
         minicov_dealloc(Mem as *mut ::core::ffi::c_void, Size, Alignment);
         return 0 as ::core::ffi::c_int;
@@ -382,9 +386,9 @@ unsafe extern "C" fn allocateOneNode() -> *mut ValueProfNode {
         fresh0 < INSTR_PROF_MAX_VP_WARNS;
         return ::core::ptr::null_mut::<ValueProfNode>();
     }
-    Node = ::core::intrinsics::atomic_xadd_seqcst(
-        &raw mut CurrentVNode as *mut intptr_t,
-        (::core::mem::size_of::<ValueProfNode>() as usize).wrapping_mul(1 as usize) as intptr_t,
+    Node = AtomicPtr::from_ptr(&raw mut CurrentVNode as *mut *mut intptr_t).fetch_ptr_add(
+        (::core::mem::size_of::<ValueProfNode>() as usize).wrapping_mul(1 as usize) as usize,
+        Ordering::SeqCst,
     ) as *mut ValueProfNode;
     if Node.offset(1 as ::core::ffi::c_int as isize) > EndVNode {
         return ::core::ptr::null_mut::<ValueProfNode>();
@@ -447,19 +451,25 @@ unsafe extern "C" fn instrumentTargetValueImpl(
     (*CurVNode).Count = (*CurVNode).Count.wrapping_add(CountValue);
     let mut Success: uint32_t = 0 as uint32_t;
     if (*ValueCounters.offset(CounterIndex as isize)).is_null() {
-        Success = ::core::intrinsics::atomic_cxchg_seqcst_seqcst(
-            ValueCounters.offset(CounterIndex as isize) as *mut *mut ValueProfNode,
+        Success = AtomicPtr::from_ptr(
+            ValueCounters.offset(CounterIndex as isize) as *mut *mut ValueProfNode
+        )
+        .compare_exchange(
             ::core::ptr::null_mut::<ValueProfNode>(),
             CurVNode,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
         )
-        .1 as uint32_t;
+        .is_ok() as uint32_t;
     } else if !PrevVNode.is_null() && (*PrevVNode).Next.is_null() {
-        Success = ::core::intrinsics::atomic_cxchg_seqcst_seqcst(
-            &raw mut (*PrevVNode).Next,
-            ::core::ptr::null_mut::<ValueProfNode>(),
-            CurVNode,
-        )
-        .1 as uint32_t;
+        Success = AtomicPtr::from_ptr(&raw mut (*PrevVNode).Next)
+            .compare_exchange(
+                ::core::ptr::null_mut::<ValueProfNode>(),
+                CurVNode,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_ok() as uint32_t;
     }
     if Success == 0 && hasStaticCounters == 0 {
         minicov_dealloc(

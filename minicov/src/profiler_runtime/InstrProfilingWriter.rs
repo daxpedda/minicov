@@ -1,4 +1,7 @@
-use ::libc;
+use core::ptr;
+
+use alloc::vec::{self, Vec};
+
 extern "C" {
     fn initBufferWriter(BufferWriter: *mut ProfDataWriter, Buffer: *mut ::core::ffi::c_char);
     fn __llvm_write_binary_ids(Writer: *mut ProfDataWriter) -> ::core::ffi::c_int;
@@ -219,7 +222,9 @@ static mut TheBufferIO: ProfBufferIO = ProfBufferIO {
 };
 static mut BufferIOBuffer: [uint8_t; 8192] = [0; 8192];
 static mut VPDataArray: [InstrProfValueData; 16] = [InstrProfValueData { Value: 0, Count: 0 }; 16];
-static mut VPDataArraySize: uint32_t = 0;
+static mut VPDataArraySize: uint32_t = (::core::mem::size_of::<[InstrProfValueData; 16]>() as usize)
+    .wrapping_div(::core::mem::size_of::<InstrProfValueData>() as usize)
+    as uint32_t;
 #[no_mangle]
 pub static mut DynamicBufferIOBuffer: *mut uint8_t = ::core::ptr::null::<uint8_t>() as *mut uint8_t;
 #[no_mangle]
@@ -238,10 +243,10 @@ pub unsafe extern "C" fn lprofBufferWriter(
             .ElmSize
             .wrapping_mul((*IOVecs.offset(I as isize)).NumElm);
         if !(*IOVecs.offset(I as isize)).Data.is_null() {
-            ::libc::memcpy(
-                *Buffer as *mut ::core::ffi::c_void,
+            ptr::copy_nonoverlapping(
                 (*IOVecs.offset(I as isize)).Data,
-                Length as ::libc::size_t,
+                *Buffer as *mut ::core::ffi::c_void,
+                Length,
             );
         } else {
             (*IOVecs.offset(I as isize)).UseZeroPadding != 0;
@@ -388,16 +393,13 @@ unsafe extern "C" fn writeOneValueProfData(
             ) as ::core::ffi::c_ulong)
                 .wrapping_sub(8 as ::core::ffi::c_ulong)
                 as uint32_t;
-            alloca_allocations.push(::std::vec::from_elem(
-                0,
-                Sz as ::core::ffi::c_ulong as usize,
-            ));
+            alloca_allocations.push(vec::from_elem(0, Sz as ::core::ffi::c_ulong as usize));
             SiteCountArray[I as usize] =
                 alloca_allocations.last_mut().unwrap().as_mut_ptr() as *mut uint8_t;
-            ::libc::memset(
+            ptr::write_bytes(
                 SiteCountArray[I as usize] as *mut ::core::ffi::c_void,
-                0 as ::core::ffi::c_int,
-                Sz as ::core::ffi::c_ulong as ::libc::size_t,
+                0,
+                Sz as ::core::ffi::c_ulong as usize,
             );
         }
         I = I.wrapping_add(1);
@@ -876,13 +878,3 @@ pub unsafe extern "C" fn lprofWriteOneBinaryId(
     return 0 as ::core::ffi::c_int;
 }
 pub const NULL: *mut ::core::ffi::c_void = ::core::ptr::null_mut::<::core::ffi::c_void>();
-unsafe extern "C" fn run_static_initializers() {
-    VPDataArraySize = (::core::mem::size_of::<[InstrProfValueData; 16]>() as usize)
-        .wrapping_div(::core::mem::size_of::<InstrProfValueData>() as usize)
-        as uint32_t;
-}
-#[used]
-#[cfg_attr(target_os = "linux", link_section = ".init_array")]
-#[cfg_attr(target_os = "windows", link_section = ".CRT$XIB")]
-#[cfg_attr(target_os = "macos", link_section = "__DATA,__mod_init_func")]
-static INIT_ARRAY: [unsafe extern "C" fn(); 1] = [run_static_initializers];

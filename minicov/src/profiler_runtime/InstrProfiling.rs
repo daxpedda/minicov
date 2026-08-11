@@ -1,4 +1,5 @@
-use ::libc;
+use core::ptr;
+
 extern "C" {
     fn lprofSetProfileDumped(_: ::core::ffi::c_uint);
     fn __llvm_profile_begin_data() -> *const __llvm_profile_data;
@@ -134,17 +135,17 @@ pub unsafe extern "C" fn __llvm_profile_reset_counters() {
         } else {
             0 as ::core::ffi::c_int
         }) as ::core::ffi::c_char;
-    ::libc::memset(
-        I as *mut ::core::ffi::c_void,
-        ResetValue as ::core::ffi::c_int,
-        E.offset_from(I) as ::core::ffi::c_long as ::core::ffi::c_ulong as ::libc::size_t,
+    ptr::write_bytes(
+        I,
+        ResetValue as u8,
+        E.offset_from(I) as ::core::ffi::c_long as ::core::ffi::c_ulong as usize,
     );
     I = __llvm_profile_begin_bitmap();
     E = __llvm_profile_end_bitmap();
-    ::libc::memset(
+    ptr::write_bytes(
         I as *mut ::core::ffi::c_void,
-        0 as ::core::ffi::c_int,
-        E.offset_from(I) as ::core::ffi::c_long as ::core::ffi::c_ulong as ::libc::size_t,
+        0,
+        E.offset_from(I) as ::core::ffi::c_long as ::core::ffi::c_ulong as usize,
     );
     let mut DataBegin = __llvm_profile_begin_data();
     let mut DataEnd = __llvm_profile_end_data();
