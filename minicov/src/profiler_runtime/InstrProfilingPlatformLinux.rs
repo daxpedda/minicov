@@ -110,77 +110,77 @@ pub type WriterCallback =
     Option<unsafe extern "C" fn(*mut ProfDataWriter, *mut ProfDataIOVec, uint32_t) -> uint32_t>;
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_begin_data() -> *const __llvm_profile_data {
-    return __start___llvm_prf_data;
+    __start___llvm_prf_data
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_end_data() -> *const __llvm_profile_data {
-    return __stop___llvm_prf_data;
+    __stop___llvm_prf_data
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_begin_names() -> *const ::core::ffi::c_char {
-    return __start___llvm_prf_names;
+    __start___llvm_prf_names
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_end_names() -> *const ::core::ffi::c_char {
-    return __stop___llvm_prf_names;
+    __stop___llvm_prf_names
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_begin_vtabnames() -> *const ::core::ffi::c_char {
-    return __start___llvm_prf_vns;
+    __start___llvm_prf_vns
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_end_vtabnames() -> *const ::core::ffi::c_char {
-    return __stop___llvm_prf_vns;
+    __stop___llvm_prf_vns
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_begin_vtables() -> *const VTableProfData {
-    return __start___llvm_prf_vtab;
+    __start___llvm_prf_vtab
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_end_vtables() -> *const VTableProfData {
-    return __stop___llvm_prf_vtab;
+    __stop___llvm_prf_vtab
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_begin_counters() -> *mut ::core::ffi::c_char {
-    return __start___llvm_prf_cnts;
+    __start___llvm_prf_cnts
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_end_counters() -> *mut ::core::ffi::c_char {
-    return __stop___llvm_prf_cnts;
+    __stop___llvm_prf_cnts
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_begin_bitmap() -> *mut ::core::ffi::c_char {
-    return __start___llvm_prf_bits;
+    __start___llvm_prf_bits
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_end_bitmap() -> *mut ::core::ffi::c_char {
-    return __stop___llvm_prf_bits;
+    __stop___llvm_prf_bits
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_begin_vnodes() -> *mut ValueProfNode {
-    return __start___llvm_prf_vnds;
+    __start___llvm_prf_vnds
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_end_vnodes() -> *mut ValueProfNode {
-    return __stop___llvm_prf_vnds;
+    __stop___llvm_prf_vnds
 }
 #[no_mangle]
 pub static mut CurrentVNode: *mut ValueProfNode =
-    unsafe { &raw const __start___llvm_prf_vnds as *mut ValueProfNode };
+    &raw const __start___llvm_prf_vnds as *mut ValueProfNode;
 #[no_mangle]
 pub static mut EndVNode: *mut ValueProfNode =
-    unsafe { &raw const __stop___llvm_prf_vnds as *mut ValueProfNode };
+    &raw const __stop___llvm_prf_vnds as *mut ValueProfNode;
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_begin_covinit() -> *const __llvm_gcov_init_func_struct {
-    return __start___llvm_covinit;
+    __start___llvm_covinit
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_end_covinit() -> *const __llvm_gcov_init_func_struct {
-    return __stop___llvm_covinit;
+    __stop___llvm_covinit
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_write_binary_ids(
-    mut Writer: *mut ProfDataWriter,
+    _Writer: *mut ProfDataWriter,
 ) -> ::core::ffi::c_int {
-    return 0 as ::core::ffi::c_int;
+    0 as ::core::ffi::c_int
 }

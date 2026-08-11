@@ -42,10 +42,6 @@ pub type uint8_t = u8;
 pub type uintptr_t = usize;
 pub type ValueKind = ::core::ffi::c_uint;
 pub const IPVK_Last: ValueKind = 2;
-pub const IPVK_First: ValueKind = 0;
-pub const IPVK_VTableTarget: ValueKind = 2;
-pub const IPVK_MemOPSize: ValueKind = 1;
-pub const IPVK_IndirectCallTarget: ValueKind = 0;
 pub type IntPtrT = *mut ::core::ffi::c_void;
 #[derive(Copy, Clone)]
 #[repr(C, align(8))]
@@ -123,7 +119,7 @@ pub const VARIANT_MASK_BYTE_COVERAGE: ::core::ffi::c_ulonglong =
 pub const VARIANT_MASK_TEMPORAL_PROF: ::core::ffi::c_ulonglong =
     (0x1 as ::core::ffi::c_ulonglong) << 63 as ::core::ffi::c_int;
 #[no_mangle]
-pub static mut VPMergeHook: Option<
+pub static VPMergeHook: Option<
     unsafe extern "C" fn(*mut ValueProfData, *mut __llvm_profile_data) -> (),
 > = Some(
     lprofMergeValueProfData
@@ -131,48 +127,43 @@ pub static mut VPMergeHook: Option<
 );
 #[no_mangle]
 pub unsafe extern "C" fn lprofGetLoadModuleSignature() -> uint64_t {
-    let mut Version = __llvm_profile_get_version();
-    let mut NumCounters = __llvm_profile_get_num_counters(
+    let Version = __llvm_profile_get_version();
+    let NumCounters = __llvm_profile_get_num_counters(
         __llvm_profile_begin_counters(),
         __llvm_profile_end_counters(),
     );
-    let mut NumData =
+    let NumData =
         __llvm_profile_get_num_data(__llvm_profile_begin_data(), __llvm_profile_end_data());
-    let mut NamesSize: uint64_t = __llvm_profile_end_names()
-        .offset_from(__llvm_profile_begin_names())
+    let NamesSize: uint64_t = __llvm_profile_end_names().offset_from(__llvm_profile_begin_names())
         as ::core::ffi::c_long as uint64_t;
-    let mut NumVnodes: uint64_t = __llvm_profile_end_vnodes()
-        .offset_from(__llvm_profile_begin_vnodes())
+    let NumVnodes: uint64_t = __llvm_profile_end_vnodes().offset_from(__llvm_profile_begin_vnodes())
         as ::core::ffi::c_long as uint64_t;
-    let mut FirstD = __llvm_profile_begin_data();
-    return (NamesSize << 40 as ::core::ffi::c_int)
+    let FirstD = __llvm_profile_begin_data();
+    (NamesSize << 40 as ::core::ffi::c_int)
         .wrapping_add(NumCounters << 30 as ::core::ffi::c_int)
         .wrapping_add(NumData << 20 as ::core::ffi::c_int)
         .wrapping_add(NumVnodes << 10 as ::core::ffi::c_int)
-        .wrapping_add(
-            (if NumData > 0 as uint64_t {
-                (*FirstD).0.NameRef
-            } else {
-                0 as uint64_t
-            }),
-        )
+        .wrapping_add(if NumData > 0 as uint64_t {
+            (*FirstD).0.NameRef
+        } else {
+            0 as uint64_t
+        })
         .wrapping_add(Version)
-        .wrapping_add(__llvm_profile_get_magic());
+        .wrapping_add(__llvm_profile_get_magic())
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_check_compatibility(
-    mut ProfileData: *const ::core::ffi::c_char,
-    mut ProfileSize: uint64_t,
+    ProfileData: *const ::core::ffi::c_char,
+    ProfileSize: uint64_t,
 ) -> ::core::ffi::c_int {
-    let mut Header = ProfileData as *mut __llvm_profile_header;
-    let mut SrcDataStart = ::core::ptr::null_mut::<__llvm_profile_data>();
-    let mut SrcDataEnd = ::core::ptr::null_mut::<__llvm_profile_data>();
-    let mut SrcData = ::core::ptr::null_mut::<__llvm_profile_data>();
-    let mut DstData = ::core::ptr::null_mut::<__llvm_profile_data>();
-    SrcDataStart = ProfileData
-        .offset(::core::mem::size_of::<__llvm_profile_header>() as usize as isize)
-        .offset((*Header).BinaryIdsSize as isize) as *mut __llvm_profile_data;
-    SrcDataEnd = SrcDataStart.offset((*Header).NumData as isize);
+    let Header = ProfileData as *mut __llvm_profile_header;
+    let mut SrcData: *mut __llvm_profile_data;
+    let mut DstData: *mut __llvm_profile_data;
+    let SrcDataStart: *mut __llvm_profile_data = ProfileData
+        .add(::core::mem::size_of::<__llvm_profile_header>() as usize)
+        .offset((*Header).BinaryIdsSize as isize)
+        as *mut __llvm_profile_data;
+    let SrcDataEnd: *mut __llvm_profile_data = SrcDataStart.offset((*Header).NumData as isize);
     if ProfileSize < ::core::mem::size_of::<__llvm_profile_header>() as uint64_t {
         return 1 as ::core::ffi::c_int;
     }
@@ -230,10 +221,10 @@ pub unsafe extern "C" fn __llvm_profile_check_compatibility(
         SrcData = SrcData.offset(1);
         DstData = DstData.offset(1);
     }
-    return 0 as ::core::ffi::c_int;
+    0 as ::core::ffi::c_int
 }
-unsafe extern "C" fn signextIfWin64(mut V: *mut ::core::ffi::c_void) -> uintptr_t {
-    return V as uintptr_t;
+unsafe extern "C" fn signextIfWin64(V: *mut ::core::ffi::c_void) -> uintptr_t {
+    V as uintptr_t
 }
 unsafe extern "C" fn getDistanceFromCounterToValueProf(
     Header: *const __llvm_profile_header,
@@ -246,43 +237,43 @@ unsafe extern "C" fn getDistanceFromCounterToValueProf(
     let VNamesSize: uint64_t = (*Header).VNamesSize;
     let PaddingBytesAfterVNamesSize: uint64_t =
         __llvm_profile_get_num_padding_bytes(VNamesSize) as uint64_t;
-    return (*Header)
+    (*Header)
         .NamesSize
         .wrapping_add(__llvm_profile_get_num_padding_bytes((*Header).NamesSize) as uint64_t)
         .wrapping_add(VTableSectionSize)
         .wrapping_add(PaddingBytesAfterVTableSection)
         .wrapping_add(VNamesSize)
-        .wrapping_add(PaddingBytesAfterVNamesSize);
+        .wrapping_add(PaddingBytesAfterVNamesSize)
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_merge_from_buffer(
-    mut ProfileData: *const ::core::ffi::c_char,
-    mut ProfileSize: uint64_t,
+    ProfileData: *const ::core::ffi::c_char,
+    ProfileSize: uint64_t,
 ) -> ::core::ffi::c_int {
     if __llvm_profile_get_version() & VARIANT_MASK_TEMPORAL_PROF as uint64_t != 0 {
         return 1 as ::core::ffi::c_int;
     }
-    let mut Header = ProfileData as *mut __llvm_profile_header;
+    let Header = ProfileData as *mut __llvm_profile_header;
     let mut CountersDelta: uintptr_t = (*Header).CountersDelta as uintptr_t;
     let mut BitmapDelta: uintptr_t = (*Header).BitmapDelta as uintptr_t;
-    let mut SrcDataStart = ProfileData
-        .offset(::core::mem::size_of::<__llvm_profile_header>() as usize as isize)
+    let SrcDataStart = ProfileData
+        .add(::core::mem::size_of::<__llvm_profile_header>() as usize)
         .offset((*Header).BinaryIdsSize as isize)
         as *mut __llvm_profile_data;
-    let mut SrcDataEnd = SrcDataStart.offset((*Header).NumData as isize);
-    let mut SrcCountersStart: uintptr_t = SrcDataEnd as uintptr_t;
-    let mut SrcCountersEnd: uintptr_t = (SrcCountersStart as uint64_t).wrapping_add(
+    let SrcDataEnd = SrcDataStart.offset((*Header).NumData as isize);
+    let SrcCountersStart: uintptr_t = SrcDataEnd as uintptr_t;
+    let SrcCountersEnd: uintptr_t = (SrcCountersStart as uint64_t).wrapping_add(
         (*Header)
             .NumCounters
             .wrapping_mul(__llvm_profile_counter_entry_size() as uint64_t),
     ) as uintptr_t;
-    let mut SrcBitmapStart: uintptr_t =
+    let SrcBitmapStart: uintptr_t =
         SrcCountersEnd.wrapping_add(__llvm_profile_get_num_padding_bytes(
             SrcCountersEnd.wrapping_sub(SrcCountersStart) as uint64_t,
         ) as uintptr_t);
-    let mut SrcNameStart: uintptr_t =
+    let SrcNameStart: uintptr_t =
         (SrcBitmapStart as uint64_t).wrapping_add((*Header).NumBitmapBytes) as uintptr_t;
-    let mut SrcValueProfDataStart: uintptr_t = (SrcNameStart as uint64_t)
+    let SrcValueProfDataStart: uintptr_t = (SrcNameStart as uint64_t)
         .wrapping_add(getDistanceFromCounterToValueProf(Header))
         as uintptr_t;
     if SrcNameStart < SrcCountersStart || SrcNameStart < SrcBitmapStart {
@@ -293,12 +284,12 @@ pub unsafe extern "C" fn __llvm_profile_merge_from_buffer(
         let mut DstCounter: uintptr_t = __llvm_profile_begin_counters() as uintptr_t;
         while SrcCounter < SrcCountersEnd {
             if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as uint64_t != 0 {
-                let ref mut fresh0 = *(DstCounter as *mut ::core::ffi::c_char);
+                let fresh0 = &mut *(DstCounter as *mut ::core::ffi::c_char);
                 *fresh0 = (*fresh0 as ::core::ffi::c_int
                     & *(SrcCounter as *const ::core::ffi::c_char) as ::core::ffi::c_int)
                     as ::core::ffi::c_char;
             } else {
-                let ref mut fresh1 = *(DstCounter as *mut uint64_t);
+                let fresh1 = &mut *(DstCounter as *mut uint64_t);
                 *fresh1 = (*fresh1).wrapping_add(*(SrcCounter as *const uint64_t));
             }
             SrcCounter = (SrcCounter as ::core::ffi::c_ulong)
@@ -310,28 +301,26 @@ pub unsafe extern "C" fn __llvm_profile_merge_from_buffer(
         }
         return 0 as ::core::ffi::c_int;
     }
-    let mut SrcData = ::core::ptr::null_mut::<__llvm_profile_data>();
-    let mut DstData = ::core::ptr::null_mut::<__llvm_profile_data>();
-    let mut SrcValueProfData: uintptr_t = 0;
+    let mut SrcData: *mut __llvm_profile_data;
+    let mut DstData: *mut __llvm_profile_data;
+    let mut SrcValueProfData: uintptr_t;
     SrcData = SrcDataStart;
     DstData = __llvm_profile_begin_data() as *mut __llvm_profile_data;
     SrcValueProfData = SrcValueProfDataStart;
     while SrcData < SrcDataEnd {
-        let mut DstCounters: uintptr_t = (DstData as uintptr_t).wrapping_add(signextIfWin64(
-            (*DstData).0.CounterPtr as *mut ::core::ffi::c_void,
-        ));
-        let mut DstBitmap: uintptr_t = (DstData as uintptr_t).wrapping_add(signextIfWin64(
-            (*DstData).0.BitmapPtr as *mut ::core::ffi::c_void,
-        ));
+        let DstCounters: uintptr_t =
+            (DstData as uintptr_t).wrapping_add(signextIfWin64((*DstData).0.CounterPtr));
+        let DstBitmap: uintptr_t =
+            (DstData as uintptr_t).wrapping_add(signextIfWin64((*DstData).0.BitmapPtr));
         let mut NVK = 0 as ::core::ffi::c_uint;
-        let mut SrcCounters: uintptr_t = SrcCountersStart
+        let SrcCounters: uintptr_t = SrcCountersStart
             .wrapping_add(((*SrcData).0.CounterPtr as uintptr_t).wrapping_sub(CountersDelta));
         CountersDelta =
             (CountersDelta as ::core::ffi::c_ulong)
                 .wrapping_sub(
                     ::core::mem::size_of::<__llvm_profile_data>() as usize as ::core::ffi::c_ulong
                 ) as uintptr_t as uintptr_t;
-        let mut NC = (*SrcData).0.NumCounters as ::core::ffi::c_uint;
+        let NC = (*SrcData).0.NumCounters as ::core::ffi::c_uint;
         if NC == 0 as ::core::ffi::c_uint {
             return 1 as ::core::ffi::c_int;
         }
@@ -346,24 +335,24 @@ pub unsafe extern "C" fn __llvm_profile_merge_from_buffer(
         let mut I = 0 as ::core::ffi::c_uint;
         while I < NC {
             if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as uint64_t != 0 {
-                let ref mut fresh2 = *(DstCounters as *mut ::core::ffi::c_char).offset(I as isize);
+                let fresh2 = &mut *(DstCounters as *mut ::core::ffi::c_char).offset(I as isize);
                 *fresh2 = (*fresh2 as ::core::ffi::c_int
                     & *(SrcCounters as *const ::core::ffi::c_char).offset(I as isize)
                         as ::core::ffi::c_int) as ::core::ffi::c_char;
             } else {
-                let ref mut fresh3 = *(DstCounters as *mut uint64_t).offset(I as isize);
+                let fresh3 = &mut *(DstCounters as *mut uint64_t).offset(I as isize);
                 *fresh3 =
                     (*fresh3).wrapping_add(*(SrcCounters as *const uint64_t).offset(I as isize));
             }
             I = I.wrapping_add(1);
         }
-        let mut SrcBitmap: uintptr_t = SrcBitmapStart
+        let SrcBitmap: uintptr_t = SrcBitmapStart
             .wrapping_add(((*SrcData).0.BitmapPtr as uintptr_t).wrapping_sub(BitmapDelta));
         BitmapDelta = (BitmapDelta as ::core::ffi::c_ulong)
             .wrapping_sub(
                 ::core::mem::size_of::<__llvm_profile_data>() as usize as ::core::ffi::c_ulong
             ) as uintptr_t as uintptr_t;
-        let mut NB = (*SrcData).0.NumBitmapBytes as ::core::ffi::c_uint;
+        let NB = (*SrcData).0.NumBitmapBytes as ::core::ffi::c_uint;
         if NB != 0 as ::core::ffi::c_uint {
             if SrcBitmap < SrcBitmapStart || SrcBitmap.wrapping_add(NB as uintptr_t) > SrcNameStart
             {
@@ -371,7 +360,7 @@ pub unsafe extern "C" fn __llvm_profile_merge_from_buffer(
             }
             let mut I_0 = 0 as ::core::ffi::c_uint;
             while I_0 < NB {
-                let ref mut fresh4 = *(DstBitmap as *mut ::core::ffi::c_char).offset(I_0 as isize);
+                let fresh4 = &mut *(DstBitmap as *mut ::core::ffi::c_char).offset(I_0 as isize);
                 *fresh4 = (*fresh4 as ::core::ffi::c_int
                     | *(SrcBitmap as *const ::core::ffi::c_char).offset(I_0 as isize)
                         as ::core::ffi::c_int) as ::core::ffi::c_char;
@@ -406,5 +395,5 @@ pub unsafe extern "C" fn __llvm_profile_merge_from_buffer(
         SrcData = SrcData.offset(1);
         DstData = DstData.offset(1);
     }
-    return 0 as ::core::ffi::c_int;
+    0 as ::core::ffi::c_int
 }

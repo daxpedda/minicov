@@ -56,14 +56,14 @@ pub struct ValueProfRecord {
 }
 #[no_mangle]
 pub unsafe extern "C" fn lprofMergeValueProfData(
-    mut SrcValueProfData: *mut ValueProfData,
-    mut DstData: *mut __llvm_profile_data,
+    SrcValueProfData: *mut ValueProfData,
+    DstData: *mut __llvm_profile_data,
 ) {
-    let mut I: ::core::ffi::c_uint = 0;
-    let mut S: ::core::ffi::c_uint = 0;
-    let mut V: ::core::ffi::c_uint = 0;
+    let mut I: ::core::ffi::c_uint;
+    let mut S: ::core::ffi::c_uint;
+    let mut V: ::core::ffi::c_uint;
     let mut DstIndex = 0 as ::core::ffi::c_uint;
-    let mut VData = ::core::ptr::null_mut::<InstrProfValueData>();
+    let mut VData: *mut InstrProfValueData;
     let mut VR = getFirstValueProfRecord(SrcValueProfData);
     I = 0 as ::core::ffi::c_uint;
     while (I as uint32_t) < (*SrcValueProfData).NumValueKinds {
@@ -71,8 +71,7 @@ pub unsafe extern "C" fn lprofMergeValueProfData(
         let mut SrcIndex = 0 as ::core::ffi::c_uint;
         S = 0 as ::core::ffi::c_uint;
         while (S as uint32_t) < (*VR).NumValueSites {
-            let mut NV: uint8_t =
-                *(&raw mut (*VR).SiteCountArray as *mut uint8_t).offset(S as isize);
+            let NV: uint8_t = *(&raw mut (*VR).SiteCountArray as *mut uint8_t).offset(S as isize);
             V = 0 as ::core::ffi::c_uint;
             while V < NV as ::core::ffi::c_uint {
                 __llvm_profile_instrument_target_value(

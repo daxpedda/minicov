@@ -83,10 +83,6 @@ pub struct InstrProfValueData {
 }
 pub type ValueKind = ::core::ffi::c_uint;
 pub const IPVK_Last: ValueKind = 2;
-pub const IPVK_First: ValueKind = 0;
-pub const IPVK_VTableTarget: ValueKind = 2;
-pub const IPVK_MemOPSize: ValueKind = 1;
-pub const IPVK_IndirectCallTarget: ValueKind = 0;
 pub type IntPtrT = *mut ::core::ffi::c_void;
 #[derive(Copy, Clone)]
 #[repr(C, align(8))]
@@ -231,15 +227,15 @@ pub static mut DynamicBufferIOBuffer: *mut uint8_t = ::core::ptr::null::<uint8_t
 pub static mut VPBufferSize: uint32_t = 0 as uint32_t;
 #[no_mangle]
 pub unsafe extern "C" fn lprofBufferWriter(
-    mut This: *mut ProfDataWriter,
-    mut IOVecs: *mut ProfDataIOVec,
-    mut NumIOVecs: uint32_t,
+    This: *mut ProfDataWriter,
+    IOVecs: *mut ProfDataIOVec,
+    NumIOVecs: uint32_t,
 ) -> uint32_t {
-    let mut I: uint32_t = 0;
-    let mut Buffer = &raw mut (*This).WriterCtx as *mut *mut ::core::ffi::c_char;
+    let mut I: uint32_t;
+    let Buffer = &raw mut (*This).WriterCtx as *mut *mut ::core::ffi::c_char;
     I = 0 as uint32_t;
     while I < NumIOVecs {
-        let mut Length: size_t = (*IOVecs.offset(I as isize))
+        let Length: size_t = (*IOVecs.offset(I as isize))
             .ElmSize
             .wrapping_mul((*IOVecs.offset(I as isize)).NumElm);
         if !(*IOVecs.offset(I as isize)).Data.is_null() {
@@ -248,19 +244,17 @@ pub unsafe extern "C" fn lprofBufferWriter(
                 *Buffer as *mut ::core::ffi::c_void,
                 Length,
             );
-        } else {
-            (*IOVecs.offset(I as isize)).UseZeroPadding != 0;
         }
-        *Buffer = (*Buffer).offset(Length as isize);
+        *Buffer = (*Buffer).add(Length);
         I = I.wrapping_add(1);
     }
-    return 0 as uint32_t;
+    0 as uint32_t
 }
 unsafe extern "C" fn llvmInitBufferIO(
-    mut BufferIO: *mut ProfBufferIO,
-    mut FileWriter: *mut ProfDataWriter,
-    mut Buffer: *mut uint8_t,
-    mut BufferSz: uint32_t,
+    BufferIO: *mut ProfBufferIO,
+    FileWriter: *mut ProfDataWriter,
+    Buffer: *mut uint8_t,
+    BufferSz: uint32_t,
 ) {
     (*BufferIO).FileWriter = FileWriter;
     (*BufferIO).OwnFileWriter = 0 as uint32_t;
@@ -269,9 +263,7 @@ unsafe extern "C" fn llvmInitBufferIO(
     (*BufferIO).CurOffset = 0 as uint32_t;
 }
 #[no_mangle]
-pub unsafe extern "C" fn lprofCreateBufferIO(
-    mut FileWriter: *mut ProfDataWriter,
-) -> *mut ProfBufferIO {
+pub unsafe extern "C" fn lprofCreateBufferIO(FileWriter: *mut ProfDataWriter) -> *mut ProfBufferIO {
     let mut Buffer = DynamicBufferIOBuffer;
     let mut BufferSize: uint32_t = VPBufferSize;
     if Buffer.is_null() {
@@ -280,10 +272,10 @@ pub unsafe extern "C" fn lprofCreateBufferIO(
         BufferSize = ::core::mem::size_of::<[uint8_t; 8192]>() as uint32_t;
     }
     llvmInitBufferIO(&raw mut TheBufferIO, FileWriter, Buffer, BufferSize);
-    return &raw mut TheBufferIO;
+    &raw mut TheBufferIO
 }
 #[no_mangle]
-pub unsafe extern "C" fn lprofDeleteBufferIO(mut BufferIO: *mut ProfBufferIO) {
+pub unsafe extern "C" fn lprofDeleteBufferIO(BufferIO: *mut ProfBufferIO) {
     if (*BufferIO).OwnFileWriter != 0 {
         FreeHook.expect("non-null function pointer")(
             (*BufferIO).FileWriter as *mut ::core::ffi::c_void,
@@ -299,14 +291,14 @@ pub unsafe extern "C" fn lprofDeleteBufferIO(mut BufferIO: *mut ProfBufferIO) {
 }
 #[no_mangle]
 pub unsafe extern "C" fn lprofBufferIOWrite(
-    mut BufferIO: *mut ProfBufferIO,
-    mut Data: *const uint8_t,
-    mut Size: uint32_t,
+    BufferIO: *mut ProfBufferIO,
+    Data: *const uint8_t,
+    Size: uint32_t,
 ) -> ::core::ffi::c_int {
-    if Size.wrapping_add((*BufferIO).CurOffset) > (*BufferIO).BufferSz {
-        if lprofBufferIOFlush(BufferIO) != 0 as ::core::ffi::c_int {
-            return -(1 as ::core::ffi::c_int);
-        }
+    if Size.wrapping_add((*BufferIO).CurOffset) > (*BufferIO).BufferSz
+        && lprofBufferIOFlush(BufferIO) != 0 as ::core::ffi::c_int
+    {
+        return -(1 as ::core::ffi::c_int);
     }
     let mut IO: [ProfDataIOVec; 1] = [ProfDataIOVec {
         Data: Data as *const ::core::ffi::c_void,
@@ -318,7 +310,7 @@ pub unsafe extern "C" fn lprofBufferIOWrite(
         if (*(*BufferIO).FileWriter)
             .Write
             .expect("non-null function pointer")(
-            (*BufferIO).FileWriter as *mut ProfDataWriter,
+            (*BufferIO).FileWriter,
             &raw mut IO as *mut ProfDataIOVec,
             1 as uint32_t,
         ) != 0
@@ -326,7 +318,7 @@ pub unsafe extern "C" fn lprofBufferIOWrite(
             return -(1 as ::core::ffi::c_int);
         }
     } else {
-        let mut Buffer = (*BufferIO)
+        let Buffer = (*BufferIO)
             .BufferStart
             .offset((*BufferIO).CurOffset as isize);
         let mut BufferWriter = ProfDataWriter {
@@ -343,10 +335,10 @@ pub unsafe extern "C" fn lprofBufferIOWrite(
             .offset_from((*BufferIO).BufferStart)
             as ::core::ffi::c_long as uint32_t;
     }
-    return 0 as ::core::ffi::c_int;
+    0 as ::core::ffi::c_int
 }
 #[no_mangle]
-pub unsafe extern "C" fn lprofBufferIOFlush(mut BufferIO: *mut ProfBufferIO) -> ::core::ffi::c_int {
+pub unsafe extern "C" fn lprofBufferIOFlush(BufferIO: *mut ProfBufferIO) -> ::core::ffi::c_int {
     if (*BufferIO).CurOffset != 0 {
         let mut IO: [ProfDataIOVec; 1] = [ProfDataIOVec {
             Data: (*BufferIO).BufferStart as *const ::core::ffi::c_void,
@@ -357,7 +349,7 @@ pub unsafe extern "C" fn lprofBufferIOFlush(mut BufferIO: *mut ProfBufferIO) -> 
         if (*(*BufferIO).FileWriter)
             .Write
             .expect("non-null function pointer")(
-            (*BufferIO).FileWriter as *mut ProfDataWriter,
+            (*BufferIO).FileWriter,
             &raw mut IO as *mut ProfDataIOVec,
             1 as uint32_t,
         ) != 0
@@ -366,16 +358,16 @@ pub unsafe extern "C" fn lprofBufferIOFlush(mut BufferIO: *mut ProfBufferIO) -> 
         }
         (*BufferIO).CurOffset = 0 as uint32_t;
     }
-    return 0 as ::core::ffi::c_int;
+    0 as ::core::ffi::c_int
 }
 unsafe extern "C" fn writeOneValueProfData(
-    mut BufferIO: *mut ProfBufferIO,
-    mut VPDataReader: *mut VPDataReaderType,
-    mut Data: *const __llvm_profile_data,
+    BufferIO: *mut ProfBufferIO,
+    VPDataReader: *mut VPDataReaderType,
+    Data: *const __llvm_profile_data,
 ) -> ::core::ffi::c_int {
     let mut alloca_allocations: Vec<Vec<u8>> = Vec::new();
-    let mut I: ::core::ffi::c_uint = 0;
-    let mut NumValueKinds = 0 as ::core::ffi::c_uint;
+    let mut I: ::core::ffi::c_uint;
+
     let mut VPHeader = ValueProfData {
         TotalSize: 0,
         NumValueKinds: 0,
@@ -386,13 +378,12 @@ unsafe extern "C" fn writeOneValueProfData(
         if (*Data).0.NumValueSites[I as usize] == 0 {
             SiteCountArray[I as usize] = ::core::ptr::null_mut::<uint8_t>();
         } else {
-            let mut Sz: uint32_t = ((*VPDataReader)
+            let Sz: uint32_t = ((*VPDataReader)
                 .GetValueProfRecordHeaderSize
                 .expect("non-null function pointer")(
                 (*Data).0.NumValueSites[I as usize] as uint32_t,
             ) as ::core::ffi::c_ulong)
-                .wrapping_sub(8 as ::core::ffi::c_ulong)
-                as uint32_t;
+                .wrapping_sub(8 as ::core::ffi::c_ulong) as uint32_t;
             alloca_allocations.push(vec::from_elem(0, Sz as ::core::ffi::c_ulong as usize));
             SiteCountArray[I as usize] =
                 alloca_allocations.last_mut().unwrap().as_mut_ptr() as *mut uint8_t;
@@ -404,7 +395,7 @@ unsafe extern "C" fn writeOneValueProfData(
         }
         I = I.wrapping_add(1);
     }
-    NumValueKinds = (*VPDataReader)
+    let NumValueKinds: ::core::ffi::c_uint = (*VPDataReader)
         .InitRTRecord
         .expect("non-null function pointer")(
         Data, &raw mut SiteCountArray as *mut *mut uint8_t
@@ -433,14 +424,14 @@ unsafe extern "C" fn writeOneValueProfData(
     }
     I = 0 as ::core::ffi::c_uint;
     while I <= IPVK_Last as ::core::ffi::c_int as ::core::ffi::c_uint {
-        let mut J: uint32_t = 0;
+        let mut J: uint32_t;
         let mut RecordHeader = ValueProfRecord {
             Kind: 0,
             NumValueSites: 0,
             SiteCountArray: [0; 1],
         };
-        let mut RecordHeaderSize: uint32_t = 8 as ::core::ffi::c_ulong as uint32_t;
-        let mut SiteCountArraySize: uint32_t = 0;
+        let RecordHeaderSize: uint32_t = 8 as ::core::ffi::c_ulong as uint32_t;
+        let SiteCountArraySize: uint32_t;
         if !((*Data).0.NumValueSites[I as usize] == 0) {
             RecordHeader.Kind = I as uint32_t;
             RecordHeader.NumValueSites = (*Data).0.NumValueSites[I as usize] as uint32_t;
@@ -463,8 +454,8 @@ unsafe extern "C" fn writeOneValueProfData(
             }
             J = 0 as uint32_t;
             while J < (*Data).0.NumValueSites[I as usize] as uint32_t {
-                let mut NRead: uint32_t = 0;
-                let mut NRemain: uint32_t = 0;
+                let mut NRead: uint32_t;
+                let mut NRemain: uint32_t;
                 let mut NextStartNode = ::core::ptr::null_mut::<ValueProfNode>();
                 NRemain = (*VPDataReader)
                     .GetNumValueDataForSite
@@ -482,16 +473,14 @@ unsafe extern "C" fn writeOneValueProfData(
                             I as uint32_t,
                             J,
                             (&raw mut VPDataArray as *mut InstrProfValueData)
-                                .offset(0 as ::core::ffi::c_int as isize)
-                                as *mut InstrProfValueData,
-                            NextStartNode as *mut ValueProfNode,
+                                .offset(0 as ::core::ffi::c_int as isize),
+                            NextStartNode,
                             NRead,
-                        ) as *mut ValueProfNode;
+                        );
                         if lprofBufferIOWrite(
                             BufferIO,
                             (&raw mut VPDataArray as *mut InstrProfValueData)
                                 .offset(0 as ::core::ffi::c_int as isize)
-                                as *mut InstrProfValueData
                                 as *const uint8_t,
                             (NRead as usize)
                                 .wrapping_mul(::core::mem::size_of::<InstrProfValueData>() as usize)
@@ -511,20 +500,19 @@ unsafe extern "C" fn writeOneValueProfData(
         }
         I = I.wrapping_add(1);
     }
-    return 0 as ::core::ffi::c_int;
+    0 as ::core::ffi::c_int
 }
 unsafe extern "C" fn writeValueProfData(
-    mut Writer: *mut ProfDataWriter,
-    mut VPDataReader: *mut VPDataReaderType,
-    mut DataBegin: *const __llvm_profile_data,
-    mut DataEnd: *const __llvm_profile_data,
+    Writer: *mut ProfDataWriter,
+    VPDataReader: *mut VPDataReaderType,
+    DataBegin: *const __llvm_profile_data,
+    DataEnd: *const __llvm_profile_data,
 ) -> ::core::ffi::c_int {
-    let mut BufferIO = ::core::ptr::null_mut::<ProfBufferIO>();
-    let mut DI = ::core::ptr::null::<__llvm_profile_data>();
+    let mut DI: *const __llvm_profile_data;
     if VPDataReader.is_null() {
         return 0 as ::core::ffi::c_int;
     }
-    BufferIO = lprofCreateBufferIO(Writer);
+    let BufferIO: *mut ProfBufferIO = lprofCreateBufferIO(Writer);
     DI = DataBegin;
     while DI < DataEnd {
         if writeOneValueProfData(BufferIO, VPDataReader, DI) != 0 {
@@ -536,28 +524,28 @@ unsafe extern "C" fn writeValueProfData(
         return -(1 as ::core::ffi::c_int);
     }
     lprofDeleteBufferIO(BufferIO);
-    return 0 as ::core::ffi::c_int;
+    0 as ::core::ffi::c_int
 }
 #[no_mangle]
 pub unsafe extern "C" fn lprofWriteData(
-    mut Writer: *mut ProfDataWriter,
-    mut VPDataReader: *mut VPDataReaderType,
-    mut SkipNameDataWrite: ::core::ffi::c_int,
+    Writer: *mut ProfDataWriter,
+    VPDataReader: *mut VPDataReaderType,
+    SkipNameDataWrite: ::core::ffi::c_int,
 ) -> ::core::ffi::c_int {
-    let mut DataBegin = __llvm_profile_begin_data();
-    let mut DataEnd = __llvm_profile_end_data();
-    let mut CountersBegin: *const ::core::ffi::c_char = __llvm_profile_begin_counters();
-    let mut CountersEnd: *const ::core::ffi::c_char = __llvm_profile_end_counters();
-    let mut BitmapBegin: *const ::core::ffi::c_char = __llvm_profile_begin_bitmap();
-    let mut BitmapEnd: *const ::core::ffi::c_char = __llvm_profile_end_bitmap();
-    let mut NamesBegin = __llvm_profile_begin_names();
-    let mut NamesEnd = __llvm_profile_end_names();
-    let mut VTableBegin = __llvm_profile_begin_vtables();
-    let mut VTableEnd = __llvm_profile_end_vtables();
-    let mut VNamesBegin = __llvm_profile_begin_vtabnames();
-    let mut VNamesEnd = __llvm_profile_end_vtabnames();
-    let mut Version = __llvm_profile_get_version();
-    return lprofWriteDataImpl(
+    let DataBegin = __llvm_profile_begin_data();
+    let DataEnd = __llvm_profile_end_data();
+    let CountersBegin: *const ::core::ffi::c_char = __llvm_profile_begin_counters();
+    let CountersEnd: *const ::core::ffi::c_char = __llvm_profile_end_counters();
+    let BitmapBegin: *const ::core::ffi::c_char = __llvm_profile_begin_bitmap();
+    let BitmapEnd: *const ::core::ffi::c_char = __llvm_profile_end_bitmap();
+    let NamesBegin = __llvm_profile_begin_names();
+    let NamesEnd = __llvm_profile_end_names();
+    let VTableBegin = __llvm_profile_begin_vtables();
+    let VTableEnd = __llvm_profile_end_vtables();
+    let VNamesBegin = __llvm_profile_begin_vtabnames();
+    let VNamesEnd = __llvm_profile_end_vtabnames();
+    let Version = __llvm_profile_get_version();
+    lprofWriteDataImpl(
         Writer,
         DataBegin,
         DataEnd,
@@ -576,28 +564,28 @@ pub unsafe extern "C" fn lprofWriteData(
         VNamesEnd,
         SkipNameDataWrite,
         Version,
-    );
+    )
 }
 #[no_mangle]
 pub unsafe extern "C" fn lprofWriteDataImpl(
-    mut Writer: *mut ProfDataWriter,
-    mut DataBegin: *const __llvm_profile_data,
-    mut DataEnd: *const __llvm_profile_data,
-    mut CountersBegin: *const ::core::ffi::c_char,
-    mut CountersEnd: *const ::core::ffi::c_char,
-    mut BitmapBegin: *const ::core::ffi::c_char,
-    mut BitmapEnd: *const ::core::ffi::c_char,
-    mut UniformCountersBegin: *const ::core::ffi::c_char,
-    mut UniformCountersEnd: *const ::core::ffi::c_char,
-    mut VPDataReader: *mut VPDataReaderType,
-    mut NamesBegin: *const ::core::ffi::c_char,
-    mut NamesEnd: *const ::core::ffi::c_char,
-    mut VTableBegin: *const VTableProfData,
-    mut VTableEnd: *const VTableProfData,
-    mut VNamesBegin: *const ::core::ffi::c_char,
-    mut VNamesEnd: *const ::core::ffi::c_char,
-    mut SkipNameDataWrite: ::core::ffi::c_int,
-    mut Version: uint64_t,
+    Writer: *mut ProfDataWriter,
+    DataBegin: *const __llvm_profile_data,
+    DataEnd: *const __llvm_profile_data,
+    CountersBegin: *const ::core::ffi::c_char,
+    CountersEnd: *const ::core::ffi::c_char,
+    BitmapBegin: *const ::core::ffi::c_char,
+    BitmapEnd: *const ::core::ffi::c_char,
+    UniformCountersBegin: *const ::core::ffi::c_char,
+    UniformCountersEnd: *const ::core::ffi::c_char,
+    VPDataReader: *mut VPDataReaderType,
+    NamesBegin: *const ::core::ffi::c_char,
+    NamesEnd: *const ::core::ffi::c_char,
+    VTableBegin: *const VTableProfData,
+    VTableEnd: *const VTableProfData,
+    VNamesBegin: *const ::core::ffi::c_char,
+    VNamesEnd: *const ::core::ffi::c_char,
+    SkipNameDataWrite: ::core::ffi::c_int,
+    Version: uint64_t,
 ) -> ::core::ffi::c_int {
     let DataSectionSize = __llvm_profile_get_data_size(DataBegin, DataEnd) as uint64_t;
     let NumData = __llvm_profile_get_num_data(DataBegin, DataEnd) as uint64_t;
@@ -617,7 +605,7 @@ pub unsafe extern "C" fn lprofWriteDataImpl(
         (UniformCountersEnd.offset_from(UniformCountersBegin) as ::core::ffi::c_long as usize)
             .wrapping_div(::core::mem::size_of::<uint64_t>() as usize)
     } else {
-        0 as usize
+        0
     }) as uint64_t;
     let UniformCountersSectionSize: uint64_t =
         NumUniformCounters.wrapping_mul(::core::mem::size_of::<uint64_t>() as uint64_t);
@@ -718,7 +706,7 @@ pub unsafe extern "C" fn lprofWriteDataImpl(
         UseZeroPadding: 0 as ::core::ffi::c_int,
     }];
     if (*Writer).Write.expect("non-null function pointer")(
-        Writer as *mut ProfDataWriter,
+        Writer,
         &raw mut IOVec as *mut ProfDataIOVec,
         (::core::mem::size_of::<[ProfDataIOVec; 1]>() as usize)
             .wrapping_div(::core::mem::size_of::<ProfDataIOVec>() as usize) as uint32_t,
@@ -824,7 +812,7 @@ pub unsafe extern "C" fn lprofWriteDataImpl(
         },
     ];
     if (*Writer).Write.expect("non-null function pointer")(
-        Writer as *mut ProfDataWriter,
+        Writer,
         &raw mut IOVecData as *mut ProfDataIOVec,
         (::core::mem::size_of::<[ProfDataIOVec; 14]>() as usize)
             .wrapping_div(::core::mem::size_of::<ProfDataIOVec>() as usize) as uint32_t,
@@ -837,14 +825,14 @@ pub unsafe extern "C" fn lprofWriteDataImpl(
     {
         return 0 as ::core::ffi::c_int;
     }
-    return writeValueProfData(Writer, VPDataReader, DataBegin, DataEnd);
+    writeValueProfData(Writer, VPDataReader, DataBegin, DataEnd)
 }
 #[no_mangle]
 pub unsafe extern "C" fn lprofWriteOneBinaryId(
-    mut Writer: *mut ProfDataWriter,
+    Writer: *mut ProfDataWriter,
     mut BinaryIdLen: uint64_t,
-    mut BinaryIdData: *const uint8_t,
-    mut BinaryIdPadding: uint64_t,
+    BinaryIdData: *const uint8_t,
+    BinaryIdPadding: uint64_t,
 ) -> ::core::ffi::c_int {
     let mut BinaryIdIOVec: [ProfDataIOVec; 3] = [
         ProfDataIOVec {
@@ -867,7 +855,7 @@ pub unsafe extern "C" fn lprofWriteOneBinaryId(
         },
     ];
     if (*Writer).Write.expect("non-null function pointer")(
-        Writer as *mut ProfDataWriter,
+        Writer,
         &raw mut BinaryIdIOVec as *mut ProfDataIOVec,
         (::core::mem::size_of::<[ProfDataIOVec; 3]>() as usize)
             .wrapping_div(::core::mem::size_of::<ProfDataIOVec>() as usize) as uint32_t,
@@ -875,6 +863,5 @@ pub unsafe extern "C" fn lprofWriteOneBinaryId(
     {
         return -(1 as ::core::ffi::c_int);
     }
-    return 0 as ::core::ffi::c_int;
+    0 as ::core::ffi::c_int
 }
-pub const NULL: *mut ::core::ffi::c_void = ::core::ptr::null_mut::<::core::ffi::c_void>();

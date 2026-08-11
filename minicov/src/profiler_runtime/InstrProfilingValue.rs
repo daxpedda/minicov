@@ -21,9 +21,6 @@ pub struct InstrProfValueData {
 pub type ValueKind = ::core::ffi::c_uint;
 pub const IPVK_Last: ValueKind = 2;
 pub const IPVK_First: ValueKind = 0;
-pub const IPVK_VTableTarget: ValueKind = 2;
-pub const IPVK_MemOPSize: ValueKind = 1;
-pub const IPVK_IndirectCallTarget: ValueKind = 0;
 pub type IntPtrT = *mut ::core::ffi::c_void;
 #[derive(Copy, Clone)]
 #[repr(C, align(8))]
@@ -117,38 +114,35 @@ pub struct ValueProfRecordClosure {
     pub AllocValueProfData: Option<unsafe extern "C" fn(size_t) -> *mut ValueProfData>,
 }
 pub const INSTR_PROF_MAX_NUM_VAL_PER_SITE: ::core::ffi::c_int = 255 as ::core::ffi::c_int;
-pub const INSTR_PROF_NULLPTR: *mut ::core::ffi::c_void = NULL;
 #[no_mangle]
-pub unsafe extern "C" fn getValueProfRecordHeaderSize(mut NumValueSites: uint32_t) -> uint32_t {
-    let mut Size: uint32_t = (8 as usize).wrapping_add(
+pub unsafe extern "C" fn getValueProfRecordHeaderSize(NumValueSites: uint32_t) -> uint32_t {
+    let mut Size: uint32_t = 8_usize.wrapping_add(
         (::core::mem::size_of::<uint8_t>() as usize).wrapping_mul(NumValueSites as usize),
     ) as uint32_t;
     Size = Size.wrapping_add(7 as uint32_t) & !(7 as ::core::ffi::c_int) as uint32_t;
-    return Size;
+    Size
 }
 #[no_mangle]
 pub unsafe extern "C" fn getValueProfRecordSize(
-    mut NumValueSites: uint32_t,
-    mut NumValueData: uint32_t,
+    NumValueSites: uint32_t,
+    NumValueData: uint32_t,
 ) -> uint32_t {
-    return (getValueProfRecordHeaderSize(NumValueSites) as usize).wrapping_add(
+    (getValueProfRecordHeaderSize(NumValueSites) as usize).wrapping_add(
         (::core::mem::size_of::<InstrProfValueData>() as usize).wrapping_mul(NumValueData as usize),
-    ) as uint32_t;
+    ) as uint32_t
 }
 #[no_mangle]
 pub unsafe extern "C" fn getValueProfRecordValueData(
-    mut This: *mut ValueProfRecord,
+    This: *mut ValueProfRecord,
 ) -> *mut InstrProfValueData {
-    return (This as *mut ::core::ffi::c_char)
+    (This as *mut ::core::ffi::c_char)
         .offset(getValueProfRecordHeaderSize((*This).NumValueSites) as isize)
-        as *mut InstrProfValueData;
+        as *mut InstrProfValueData
 }
 #[no_mangle]
-pub unsafe extern "C" fn getValueProfRecordNumValueData(
-    mut This: *mut ValueProfRecord,
-) -> uint32_t {
+pub unsafe extern "C" fn getValueProfRecordNumValueData(This: *mut ValueProfRecord) -> uint32_t {
     let mut NumValueData: uint32_t = 0 as uint32_t;
-    let mut I: uint32_t = 0;
+    let mut I: uint32_t;
     I = 0 as uint32_t;
     while I < (*This).NumValueSites {
         NumValueData = NumValueData.wrapping_add(
@@ -156,35 +150,30 @@ pub unsafe extern "C" fn getValueProfRecordNumValueData(
         );
         I = I.wrapping_add(1);
     }
-    return NumValueData;
+    NumValueData
 }
 #[no_mangle]
 pub unsafe extern "C" fn getValueProfRecordNext(
-    mut This: *mut ValueProfRecord,
+    This: *mut ValueProfRecord,
 ) -> *mut ValueProfRecord {
-    let mut NumValueData = getValueProfRecordNumValueData(This);
-    return (This as *mut ::core::ffi::c_char)
+    let NumValueData = getValueProfRecordNumValueData(This);
+    (This as *mut ::core::ffi::c_char)
         .offset(getValueProfRecordSize((*This).NumValueSites, NumValueData) as isize)
-        as *mut ValueProfRecord;
+        as *mut ValueProfRecord
 }
 #[no_mangle]
-pub unsafe extern "C" fn getFirstValueProfRecord(
-    mut This: *mut ValueProfData,
-) -> *mut ValueProfRecord {
-    return (This as *mut ::core::ffi::c_char)
-        .offset(::core::mem::size_of::<ValueProfData>() as usize as isize)
-        as *mut ValueProfRecord;
+pub unsafe extern "C" fn getFirstValueProfRecord(This: *mut ValueProfData) -> *mut ValueProfRecord {
+    (This as *mut ::core::ffi::c_char).add(::core::mem::size_of::<ValueProfData>() as usize)
+        as *mut ValueProfRecord
 }
 #[no_mangle]
-pub unsafe extern "C" fn getValueProfDataSize(
-    mut Closure: *mut ValueProfRecordClosure,
-) -> uint32_t {
-    let mut Kind: uint32_t = 0;
+pub unsafe extern "C" fn getValueProfDataSize(Closure: *mut ValueProfRecordClosure) -> uint32_t {
+    let mut Kind: uint32_t;
     let mut TotalSize: uint32_t = ::core::mem::size_of::<ValueProfData>() as uint32_t;
-    let mut Record = (*Closure).Record;
+    let Record = (*Closure).Record;
     Kind = IPVK_First as ::core::ffi::c_int as uint32_t;
     while Kind <= IPVK_Last as ::core::ffi::c_int as uint32_t {
-        let mut NumValueSites = (*Closure)
+        let NumValueSites = (*Closure)
             .GetNumValueSites
             .expect("non-null function pointer")(Record, Kind);
         if !(NumValueSites == 0) {
@@ -197,23 +186,23 @@ pub unsafe extern "C" fn getValueProfDataSize(
         }
         Kind = Kind.wrapping_add(1);
     }
-    return TotalSize;
+    TotalSize
 }
 #[no_mangle]
 pub unsafe extern "C" fn serializeValueProfRecordFrom(
-    mut This: *mut ValueProfRecord,
-    mut Closure: *mut ValueProfRecordClosure,
-    mut ValueKind: uint32_t,
-    mut NumValueSites: uint32_t,
+    This: *mut ValueProfRecord,
+    Closure: *mut ValueProfRecordClosure,
+    ValueKind: uint32_t,
+    NumValueSites: uint32_t,
 ) {
-    let mut S: uint32_t = 0;
-    let mut Record = (*Closure).Record;
+    let mut S: uint32_t;
+    let Record = (*Closure).Record;
     (*This).Kind = ValueKind;
     (*This).NumValueSites = NumValueSites;
     let mut DstVD = getValueProfRecordValueData(This);
     S = 0 as uint32_t;
     while S < NumValueSites {
-        let mut ND = (*Closure)
+        let ND = (*Closure)
             .GetNumValueDataForSite
             .expect("non-null function pointer")(Record, ValueKind, S);
         *(&raw mut (*This).SiteCountArray as *mut uint8_t).offset(S as isize) = ND as uint8_t;
@@ -226,16 +215,16 @@ pub unsafe extern "C" fn serializeValueProfRecordFrom(
 }
 #[no_mangle]
 pub unsafe extern "C" fn serializeValueProfDataFrom(
-    mut Closure: *mut ValueProfRecordClosure,
-    mut DstData: *mut ValueProfData,
+    Closure: *mut ValueProfRecordClosure,
+    DstData: *mut ValueProfData,
 ) -> *mut ValueProfData {
-    let mut Kind: uint32_t = 0;
-    let mut TotalSize: uint32_t = if !DstData.is_null() {
+    let mut Kind: uint32_t;
+    let TotalSize: uint32_t = if !DstData.is_null() {
         (*DstData).TotalSize
     } else {
         getValueProfDataSize(Closure)
     };
-    let mut VPD = if !DstData.is_null() {
+    let VPD = if !DstData.is_null() {
         DstData
     } else {
         (*Closure)
@@ -249,7 +238,7 @@ pub unsafe extern "C" fn serializeValueProfDataFrom(
     let mut VR = getFirstValueProfRecord(VPD);
     Kind = IPVK_First as ::core::ffi::c_int as uint32_t;
     while Kind <= IPVK_Last as ::core::ffi::c_int as uint32_t {
-        let mut NumValueSites =
+        let NumValueSites =
             (*Closure)
                 .GetNumValueSites
                 .expect("non-null function pointer")((*Closure).Record, Kind);
@@ -259,46 +248,45 @@ pub unsafe extern "C" fn serializeValueProfDataFrom(
         }
         Kind = Kind.wrapping_add(1);
     }
-    return VPD;
+    VPD
 }
 #[no_mangle]
-pub unsafe extern "C" fn InstProfClzll(mut X: ::core::ffi::c_ulonglong) -> ::core::ffi::c_int {
-    return X.leading_zeros() as i32;
+pub unsafe extern "C" fn InstProfClzll(X: ::core::ffi::c_ulonglong) -> ::core::ffi::c_int {
+    X.leading_zeros() as i32
 }
 #[no_mangle]
-pub unsafe extern "C" fn InstProfPopcountll(mut X: ::core::ffi::c_ulonglong) -> ::core::ffi::c_int {
-    return X.count_ones() as i32;
+pub unsafe extern "C" fn InstProfPopcountll(X: ::core::ffi::c_ulonglong) -> ::core::ffi::c_int {
+    X.count_ones() as i32
 }
 #[no_mangle]
-pub unsafe extern "C" fn InstrProfGetRangeRepValue(mut Value: uint64_t) -> uint64_t {
+pub unsafe extern "C" fn InstrProfGetRangeRepValue(Value: uint64_t) -> uint64_t {
     if Value <= 8 as uint64_t {
-        return Value;
+        Value
     } else if Value >= 513 as uint64_t {
-        return 513 as uint64_t;
+        513 as uint64_t
     } else if InstProfPopcountll(Value as ::core::ffi::c_ulonglong) == 1 as ::core::ffi::c_int {
-        return Value;
+        Value
     } else {
-        return ((1 as uint64_t)
-            << 64 as ::core::ffi::c_int
+        ((1 as uint64_t)
+            << (64 as ::core::ffi::c_int
                 - InstProfClzll(Value as ::core::ffi::c_ulonglong)
-                - 1 as ::core::ffi::c_int)
-            .wrapping_add(1 as uint64_t);
-    };
+                - 1 as ::core::ffi::c_int))
+            .wrapping_add(1 as uint64_t)
+    }
 }
 #[no_mangle]
-pub unsafe extern "C" fn InstrProfIsSingleValRange(mut Value: uint64_t) -> ::core::ffi::c_uint {
-    if Value <= 8 as uint64_t {
-        return 1 as ::core::ffi::c_uint;
-    } else if InstProfPopcountll(Value as ::core::ffi::c_ulonglong) == 1 as ::core::ffi::c_int {
-        return 1 as ::core::ffi::c_uint;
+pub unsafe extern "C" fn InstrProfIsSingleValRange(Value: uint64_t) -> ::core::ffi::c_uint {
+    if Value <= 8 as uint64_t
+        || InstProfPopcountll(Value as ::core::ffi::c_ulonglong) == 1 as ::core::ffi::c_int
+    {
+        1 as ::core::ffi::c_uint
     } else {
-        return 0 as ::core::ffi::c_uint;
-    };
+        0 as ::core::ffi::c_uint
+    }
 }
 static mut hasStaticCounters: ::core::ffi::c_int = 1 as ::core::ffi::c_int;
 static mut OutOfNodesWarnings: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
 static mut hasNonDefaultValsPerSite: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
-pub const INSTR_PROF_MAX_VP_WARNS: ::core::ffi::c_int = 10 as ::core::ffi::c_int;
 pub const INSTR_PROF_DEFAULT_NUM_VAL_PER_SITE: ::core::ffi::c_int = 24 as ::core::ffi::c_int;
 #[no_mangle]
 #[link_section = "__llvm_prf_vnds"]
@@ -312,36 +300,36 @@ pub static mut VPMaxNumValsPerSite: uint32_t = INSTR_PROF_DEFAULT_NUM_VAL_PER_SI
 #[no_mangle]
 pub unsafe extern "C" fn lprofSetupValueProfiler() {}
 #[no_mangle]
-pub unsafe extern "C" fn lprofSetMaxValsPerSite(mut MaxVals: uint32_t) {
+pub unsafe extern "C" fn lprofSetMaxValsPerSite(MaxVals: uint32_t) {
     VPMaxNumValsPerSite = MaxVals;
     hasNonDefaultValsPerSite = 1 as ::core::ffi::c_int;
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_set_num_value_sites(
-    mut Data: *mut __llvm_profile_data,
-    mut ValueKind: uint32_t,
-    mut NumValueSites: uint16_t,
+    Data: *mut __llvm_profile_data,
+    ValueKind: uint32_t,
+    NumValueSites: uint16_t,
 ) {
     *((&raw const (*Data).0.NumValueSites as *const uint16_t).offset(ValueKind as isize)
         as *const uint16_t as *mut uint16_t) = NumValueSites;
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_iterate_data(
-    mut Data: *const __llvm_profile_data,
+    Data: *const __llvm_profile_data,
 ) -> *const __llvm_profile_data {
-    return Data.offset(1 as ::core::ffi::c_int as isize);
+    Data.offset(1 as ::core::ffi::c_int as isize)
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_get_function_addr(
-    mut Data: *const __llvm_profile_data,
+    Data: *const __llvm_profile_data,
 ) -> *mut ::core::ffi::c_void {
-    return (*Data).0.FunctionPointer as *mut ::core::ffi::c_void;
+    (*Data).0.FunctionPointer
 }
 unsafe extern "C" fn allocateValueProfileCounters(
-    mut Data: *mut __llvm_profile_data,
+    Data: *mut __llvm_profile_data,
 ) -> ::core::ffi::c_int {
     let mut NumVSites: uint64_t = 0 as uint64_t;
-    let mut VKI: uint32_t = 0;
+    let mut VKI: uint32_t;
     hasStaticCounters = 0 as ::core::ffi::c_int;
     if hasNonDefaultValsPerSite == 0 {
         VPMaxNumValsPerSite = INSTR_PROF_MAX_NUM_VAL_PER_SITE as uint32_t;
@@ -354,7 +342,7 @@ unsafe extern "C" fn allocateValueProfileCounters(
     let Size: size_t =
         NumVSites.wrapping_mul(::core::mem::size_of::<*mut ValueProfNode>() as uint64_t) as size_t;
     let Alignment: size_t = ::core::mem::align_of::<*mut ValueProfNode>();
-    let mut Mem = minicov_alloc_zeroed(Size, Alignment) as *mut *mut ValueProfNode;
+    let Mem = minicov_alloc_zeroed(Size, Alignment) as *mut *mut ValueProfNode;
     if Mem.is_null() {
         return 0 as ::core::ffi::c_int;
     }
@@ -370,10 +358,9 @@ unsafe extern "C" fn allocateValueProfileCounters(
         minicov_dealloc(Mem as *mut ::core::ffi::c_void, Size, Alignment);
         return 0 as ::core::ffi::c_int;
     }
-    return 1 as ::core::ffi::c_int;
+    1 as ::core::ffi::c_int
 }
 unsafe extern "C" fn allocateOneNode() -> *mut ValueProfNode {
-    let mut Node = ::core::ptr::null_mut::<ValueProfNode>();
     if hasStaticCounters == 0 {
         return minicov_alloc_zeroed(
             ::core::mem::size_of::<ValueProfNode>() as size_t,
@@ -381,40 +368,36 @@ unsafe extern "C" fn allocateOneNode() -> *mut ValueProfNode {
         ) as *mut ValueProfNode;
     }
     if CurrentVNode.offset(1 as ::core::ffi::c_int as isize) > EndVNode {
-        let fresh0 = OutOfNodesWarnings;
-        OutOfNodesWarnings = OutOfNodesWarnings + 1;
-        fresh0 < INSTR_PROF_MAX_VP_WARNS;
+        OutOfNodesWarnings += 1;
         return ::core::ptr::null_mut::<ValueProfNode>();
     }
-    Node = AtomicPtr::from_ptr(&raw mut CurrentVNode as *mut *mut intptr_t).fetch_ptr_add(
-        (::core::mem::size_of::<ValueProfNode>() as usize).wrapping_mul(1 as usize) as usize,
+    let Node = AtomicPtr::from_ptr(&raw mut CurrentVNode as *mut *mut intptr_t).fetch_ptr_add(
+        (::core::mem::size_of::<ValueProfNode>() as usize).wrapping_mul(1) as usize,
         Ordering::SeqCst,
     ) as *mut ValueProfNode;
     if Node.offset(1 as ::core::ffi::c_int as isize) > EndVNode {
         return ::core::ptr::null_mut::<ValueProfNode>();
     }
-    return Node;
+    Node
 }
 #[inline(always)]
 unsafe extern "C" fn instrumentTargetValueImpl(
-    mut TargetValue: uint64_t,
-    mut Data: *mut ::core::ffi::c_void,
-    mut CounterIndex: uint32_t,
-    mut CountValue: uint64_t,
+    TargetValue: uint64_t,
+    Data: *mut ::core::ffi::c_void,
+    CounterIndex: uint32_t,
+    CountValue: uint64_t,
 ) {
-    let mut PData = Data as *mut __llvm_profile_data;
+    let PData = Data as *mut __llvm_profile_data;
     if PData.is_null() {
         return;
     }
     if CountValue == 0 {
         return;
     }
-    if (*PData).0.Values.is_null() {
-        if allocateValueProfileCounters(PData) == 0 {
-            return;
-        }
+    if (*PData).0.Values.is_null() && allocateValueProfileCounters(PData) == 0 {
+        return;
     }
-    let mut ValueCounters = (*PData).0.Values as *mut *mut ValueProfNode;
+    let ValueCounters = (*PData).0.Values as *mut *mut ValueProfNode;
     let mut PrevVNode = ::core::ptr::null_mut::<ValueProfNode>();
     let mut MinCountVNode = ::core::ptr::null_mut::<ValueProfNode>();
     let mut CurVNode = *ValueCounters.offset(CounterIndex as isize);
@@ -430,7 +413,7 @@ unsafe extern "C" fn instrumentTargetValueImpl(
             MinCountVNode = CurVNode;
         }
         PrevVNode = CurVNode;
-        CurVNode = (*CurVNode).Next as *mut ValueProfNode;
+        CurVNode = (*CurVNode).Next;
         VDataCount = VDataCount.wrapping_add(1);
     }
     if VDataCount as uint32_t >= VPMaxNumValsPerSite {
@@ -451,16 +434,14 @@ unsafe extern "C" fn instrumentTargetValueImpl(
     (*CurVNode).Count = (*CurVNode).Count.wrapping_add(CountValue);
     let mut Success: uint32_t = 0 as uint32_t;
     if (*ValueCounters.offset(CounterIndex as isize)).is_null() {
-        Success = AtomicPtr::from_ptr(
-            ValueCounters.offset(CounterIndex as isize) as *mut *mut ValueProfNode
-        )
-        .compare_exchange(
-            ::core::ptr::null_mut::<ValueProfNode>(),
-            CurVNode,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
-        )
-        .is_ok() as uint32_t;
+        Success = AtomicPtr::from_ptr(ValueCounters.offset(CounterIndex as isize))
+            .compare_exchange(
+                ::core::ptr::null_mut::<ValueProfNode>(),
+                CurVNode,
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+            )
+            .is_ok() as uint32_t;
     } else if !PrevVNode.is_null() && (*PrevVNode).Next.is_null() {
         Success = AtomicPtr::from_ptr(&raw mut (*PrevVNode).Next)
             .compare_exchange(
@@ -477,50 +458,43 @@ unsafe extern "C" fn instrumentTargetValueImpl(
             ::core::mem::size_of::<ValueProfNode>() as size_t,
             ::core::mem::align_of::<ValueProfNode>(),
         );
-        return;
     }
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_instrument_target(
-    mut TargetValue: uint64_t,
-    mut Data: *mut ::core::ffi::c_void,
-    mut CounterIndex: uint32_t,
+    TargetValue: uint64_t,
+    Data: *mut ::core::ffi::c_void,
+    CounterIndex: uint32_t,
 ) {
     instrumentTargetValueImpl(TargetValue, Data, CounterIndex, 1 as uint64_t);
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_instrument_target_value(
-    mut TargetValue: uint64_t,
-    mut Data: *mut ::core::ffi::c_void,
-    mut CounterIndex: uint32_t,
-    mut CountValue: uint64_t,
+    TargetValue: uint64_t,
+    Data: *mut ::core::ffi::c_void,
+    CounterIndex: uint32_t,
+    CountValue: uint64_t,
 ) {
     instrumentTargetValueImpl(TargetValue, Data, CounterIndex, CountValue);
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_instrument_memop(
-    mut TargetValue: uint64_t,
-    mut Data: *mut ::core::ffi::c_void,
-    mut CounterIndex: uint32_t,
+    TargetValue: uint64_t,
+    Data: *mut ::core::ffi::c_void,
+    CounterIndex: uint32_t,
 ) {
-    let mut RepValue = InstrProfGetRangeRepValue(TargetValue);
+    let RepValue = InstrProfGetRangeRepValue(TargetValue);
     __llvm_profile_instrument_target(RepValue, Data, CounterIndex);
 }
-unsafe extern "C" fn getNumValueSitesRT(
-    mut R: *const ::core::ffi::c_void,
-    mut VK: uint32_t,
-) -> uint32_t {
-    return (*(*(R as *const ValueProfRuntimeRecord)).Data)
+unsafe extern "C" fn getNumValueSitesRT(R: *const ::core::ffi::c_void, VK: uint32_t) -> uint32_t {
+    (*(*(R as *const ValueProfRuntimeRecord)).Data)
         .0
-        .NumValueSites[VK as usize] as uint32_t;
+        .NumValueSites[VK as usize] as uint32_t
 }
-unsafe extern "C" fn getNumValueDataRT(
-    mut R: *const ::core::ffi::c_void,
-    mut VK: uint32_t,
-) -> uint32_t {
+unsafe extern "C" fn getNumValueDataRT(R: *const ::core::ffi::c_void, VK: uint32_t) -> uint32_t {
     let mut S: uint32_t = 0 as uint32_t;
-    let mut I: uint32_t = 0;
-    let mut Record = R as *const ValueProfRuntimeRecord;
+    let mut I: uint32_t;
+    let Record = R as *const ValueProfRuntimeRecord;
     if (*(*Record).SiteCountArray.offset(VK as isize)).is_null() {
         return 0 as uint32_t;
     }
@@ -531,22 +505,22 @@ unsafe extern "C" fn getNumValueDataRT(
         );
         I = I.wrapping_add(1);
     }
-    return S;
+    S
 }
 unsafe extern "C" fn getNumValueDataForSiteRT(
-    mut R: *const ::core::ffi::c_void,
-    mut VK: uint32_t,
-    mut S: uint32_t,
+    R: *const ::core::ffi::c_void,
+    VK: uint32_t,
+    S: uint32_t,
 ) -> uint32_t {
-    let mut Record = R as *const ValueProfRuntimeRecord;
-    return *(*(*Record).SiteCountArray.offset(VK as isize)).offset(S as isize) as uint32_t;
+    let Record = R as *const ValueProfRuntimeRecord;
+    *(*(*Record).SiteCountArray.offset(VK as isize)).offset(S as isize) as uint32_t
 }
 static mut RTRecord: ValueProfRuntimeRecord = ValueProfRuntimeRecord {
     Data: ::core::ptr::null::<__llvm_profile_data>(),
     NodesKind: [::core::ptr::null::<*mut ValueProfNode>() as *mut *mut ValueProfNode; 3],
     SiteCountArray: ::core::ptr::null::<*mut uint8_t>() as *mut *mut uint8_t,
 };
-static mut RTRecordClosure: ValueProfRecordClosure = unsafe {
+static mut RTRecordClosure: ValueProfRecordClosure = {
     ValueProfRecordClosure {
         Record: &raw const RTRecord as *mut ValueProfRuntimeRecord as *const ::core::ffi::c_void,
         GetNumValueKinds: None,
@@ -568,23 +542,23 @@ static mut RTRecordClosure: ValueProfRecordClosure = unsafe {
     }
 };
 unsafe extern "C" fn initializeValueProfRuntimeRecord(
-    mut Data: *const __llvm_profile_data,
-    mut SiteCountArray: *mut *mut uint8_t,
+    Data: *const __llvm_profile_data,
+    SiteCountArray: *mut *mut uint8_t,
 ) -> uint32_t {
-    let mut I: ::core::ffi::c_uint = 0;
-    let mut J: ::core::ffi::c_uint = 0;
+    let mut I: ::core::ffi::c_uint;
+    let mut J: ::core::ffi::c_uint;
     let mut S = 0 as ::core::ffi::c_uint;
     let mut NumValueKinds = 0 as ::core::ffi::c_uint;
-    let mut Nodes = (*Data).0.Values as *mut *mut ValueProfNode;
+    let Nodes = (*Data).0.Values as *mut *mut ValueProfNode;
     RTRecord.Data = Data;
-    RTRecord.SiteCountArray = SiteCountArray as *mut *mut uint8_t;
+    RTRecord.SiteCountArray = SiteCountArray;
     I = 0 as ::core::ffi::c_uint;
     while I <= IPVK_Last as ::core::ffi::c_int as ::core::ffi::c_uint {
-        let mut N: uint16_t = (*Data).0.NumValueSites[I as usize];
+        let N: uint16_t = (*Data).0.NumValueSites[I as usize];
         if !(N == 0) {
             NumValueKinds = NumValueKinds.wrapping_add(1);
             RTRecord.NodesKind[I as usize] = if !Nodes.is_null() {
-                Nodes.offset(S as isize) as *mut *mut ValueProfNode
+                Nodes.offset(S as isize)
             } else {
                 ::core::ptr::null_mut::<*mut ValueProfNode>()
             };
@@ -598,7 +572,7 @@ unsafe extern "C" fn initializeValueProfRuntimeRecord(
                 };
                 while !Site.is_null() {
                     C = C.wrapping_add(1);
-                    Site = (*Site).Next as *mut ValueProfNode;
+                    Site = (*Site).Next;
                 }
                 if C > UCHAR_MAX as uint32_t {
                     C = UCHAR_MAX as uint32_t;
@@ -610,16 +584,16 @@ unsafe extern "C" fn initializeValueProfRuntimeRecord(
         }
         I = I.wrapping_add(1);
     }
-    return NumValueKinds as uint32_t;
+    NumValueKinds as uint32_t
 }
 unsafe extern "C" fn getNextNValueData(
-    mut VK: uint32_t,
-    mut Site: uint32_t,
-    mut Dst: *mut InstrProfValueData,
-    mut StartNode: *mut ValueProfNode,
-    mut N: uint32_t,
+    VK: uint32_t,
+    Site: uint32_t,
+    Dst: *mut InstrProfValueData,
+    StartNode: *mut ValueProfNode,
+    N: uint32_t,
 ) -> *mut ValueProfNode {
-    let mut I: ::core::ffi::c_uint = 0;
+    let mut I: ::core::ffi::c_uint;
     let mut VNode = if !StartNode.is_null() {
         StartNode
     } else {
@@ -629,18 +603,18 @@ unsafe extern "C" fn getNextNValueData(
     while (I as uint32_t) < N {
         (*Dst.offset(I as isize)).Value = (*VNode).Value;
         (*Dst.offset(I as isize)).Count = (*VNode).Count;
-        VNode = (*VNode).Next as *mut ValueProfNode;
+        VNode = (*VNode).Next;
         I = I.wrapping_add(1);
     }
-    return VNode;
+    VNode
 }
 unsafe extern "C" fn getValueProfDataSizeWrapper() -> uint32_t {
-    return getValueProfDataSize(&raw mut RTRecordClosure);
+    getValueProfDataSize(&raw mut RTRecordClosure)
 }
-unsafe extern "C" fn getNumValueDataForSiteWrapper(mut VK: uint32_t, mut S: uint32_t) -> uint32_t {
-    return getNumValueDataForSiteRT(&raw mut RTRecord as *const ::core::ffi::c_void, VK, S);
+unsafe extern "C" fn getNumValueDataForSiteWrapper(VK: uint32_t, S: uint32_t) -> uint32_t {
+    getNumValueDataForSiteRT(&raw mut RTRecord as *const ::core::ffi::c_void, VK, S)
 }
-static mut TheVPDataReader: VPDataReaderType = unsafe {
+static mut TheVPDataReader: VPDataReaderType = {
     VPDataReaderType {
         InitRTRecord: Some(
             initializeValueProfRuntimeRecord
@@ -673,9 +647,8 @@ static mut TheVPDataReader: VPDataReaderType = unsafe {
 };
 #[no_mangle]
 pub unsafe extern "C" fn lprofGetVPDataReader() -> *mut VPDataReaderType {
-    return &raw mut TheVPDataReader;
+    &raw mut TheVPDataReader
 }
 pub const UCHAR_MAX: ::core::ffi::c_int =
     __SCHAR_MAX__ * 2 as ::core::ffi::c_int + 1 as ::core::ffi::c_int;
-pub const NULL: *mut ::core::ffi::c_void = ::core::ptr::null_mut::<::core::ffi::c_void>();
 pub const __SCHAR_MAX__: ::core::ffi::c_int = 127 as ::core::ffi::c_int;

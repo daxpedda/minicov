@@ -47,34 +47,13 @@ const __llvm_profile_data_PADDING: usize = ::core::mem::size_of::<__llvm_profile
 pub const IPVK_Last: ValueKind = 2;
 pub const IPVK_First: ValueKind = 0;
 pub type ValueKind = ::core::ffi::c_uint;
-pub const IPVK_VTableTarget: ValueKind = 2;
-pub const IPVK_MemOPSize: ValueKind = 1;
-pub const IPVK_IndirectCallTarget: ValueKind = 0;
-pub const INSTR_PROF_RAW_MAGIC_64: uint64_t = (255 as ::core::ffi::c_int as uint64_t)
-    << 56 as ::core::ffi::c_int
-    | ('l' as i32 as uint64_t) << 48 as ::core::ffi::c_int
-    | ('p' as i32 as uint64_t) << 40 as ::core::ffi::c_int
-    | ('r' as i32 as uint64_t) << 32 as ::core::ffi::c_int
-    | ('o' as i32 as uint64_t) << 24 as ::core::ffi::c_int
-    | ('f' as i32 as uint64_t) << 16 as ::core::ffi::c_int
-    | ('r' as i32 as uint64_t) << 8 as ::core::ffi::c_int
-    | 129 as ::core::ffi::c_int as uint64_t;
-pub const INSTR_PROF_RAW_MAGIC_32: uint64_t = (255 as ::core::ffi::c_int as uint64_t)
-    << 56 as ::core::ffi::c_int
-    | ('l' as i32 as uint64_t) << 48 as ::core::ffi::c_int
-    | ('p' as i32 as uint64_t) << 40 as ::core::ffi::c_int
-    | ('r' as i32 as uint64_t) << 32 as ::core::ffi::c_int
-    | ('o' as i32 as uint64_t) << 24 as ::core::ffi::c_int
-    | ('f' as i32 as uint64_t) << 16 as ::core::ffi::c_int
-    | ('R' as i32 as uint64_t) << 8 as ::core::ffi::c_int
-    | 129 as ::core::ffi::c_int as uint64_t;
 pub const VARIANT_MASK_BYTE_COVERAGE: ::core::ffi::c_ulonglong =
     (0x1 as ::core::ffi::c_ulonglong) << 60 as ::core::ffi::c_int;
 pub const VARIANT_MASK_TEMPORAL_PROF: ::core::ffi::c_ulonglong =
     (0x1 as ::core::ffi::c_ulonglong) << 63 as ::core::ffi::c_int;
 static mut __llvm_profile_global_timestamp: uint32_t = 1 as uint32_t;
 #[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_set_timestamp(mut Probe: *mut uint64_t) {
+pub unsafe extern "C" fn __llvm_profile_set_timestamp(Probe: *mut uint64_t) {
     if *Probe == 0 as uint64_t || *Probe == -(1 as ::core::ffi::c_int) as uint64_t {
         let fresh0 = __llvm_profile_global_timestamp;
         __llvm_profile_global_timestamp = __llvm_profile_global_timestamp.wrapping_add(1);
@@ -83,7 +62,7 @@ pub unsafe extern "C" fn __llvm_profile_set_timestamp(mut Probe: *mut uint64_t) 
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_get_magic() -> uint64_t {
-    return if ::core::mem::size_of::<*mut ::core::ffi::c_void>() as usize
+    if ::core::mem::size_of::<*mut ::core::ffi::c_void>() as usize
         == ::core::mem::size_of::<uint64_t>() as usize
     {
         (255 as ::core::ffi::c_int as uint64_t) << 56 as ::core::ffi::c_int
@@ -103,24 +82,22 @@ pub unsafe extern "C" fn __llvm_profile_get_magic() -> uint64_t {
             | ('f' as i32 as uint64_t) << 16 as ::core::ffi::c_int
             | ('R' as i32 as uint64_t) << 8 as ::core::ffi::c_int
             | 129 as ::core::ffi::c_int as uint64_t
-    };
+    }
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_set_dumped() {
     lprofSetProfileDumped(1 as ::core::ffi::c_uint);
 }
 #[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_num_padding_bytes(
-    mut SizeInBytes: uint64_t,
-) -> uint8_t {
-    return (7 as uint64_t
+pub unsafe extern "C" fn __llvm_profile_get_num_padding_bytes(SizeInBytes: uint64_t) -> uint8_t {
+    (7 as uint64_t
         & (::core::mem::size_of::<uint64_t>() as uint64_t)
             .wrapping_sub(SizeInBytes.wrapping_rem(::core::mem::size_of::<uint64_t>() as uint64_t)))
-        as uint8_t;
+        as uint8_t
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_get_version() -> uint64_t {
-    return __llvm_profile_raw_version;
+    __llvm_profile_raw_version
 }
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_reset_counters() {
@@ -129,12 +106,12 @@ pub unsafe extern "C" fn __llvm_profile_reset_counters() {
     }
     let mut I = __llvm_profile_begin_counters();
     let mut E = __llvm_profile_end_counters();
-    let mut ResetValue =
-        (if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as uint64_t != 0 {
-            0xff as ::core::ffi::c_int
-        } else {
-            0 as ::core::ffi::c_int
-        }) as ::core::ffi::c_char;
+    let ResetValue = (if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as uint64_t != 0
+    {
+        0xff as ::core::ffi::c_int
+    } else {
+        0 as ::core::ffi::c_int
+    }) as ::core::ffi::c_char;
     ptr::write_bytes(
         I,
         ResetValue as u8,
@@ -147,16 +124,16 @@ pub unsafe extern "C" fn __llvm_profile_reset_counters() {
         0,
         E.offset_from(I) as ::core::ffi::c_long as ::core::ffi::c_ulong as usize,
     );
-    let mut DataBegin = __llvm_profile_begin_data();
-    let mut DataEnd = __llvm_profile_end_data();
-    let mut DI = ::core::ptr::null::<__llvm_profile_data>();
+    let DataBegin = __llvm_profile_begin_data();
+    let DataEnd = __llvm_profile_end_data();
+    let mut DI: *const __llvm_profile_data;
     DI = DataBegin;
     while DI < DataEnd {
         let mut CurrentVSiteCount: uint64_t = 0 as uint64_t;
-        let mut VKI: uint32_t = 0;
-        let mut i: uint32_t = 0;
+        let mut VKI: uint32_t;
+        let mut i: uint32_t;
         if !(*DI).0.Values.is_null() {
-            let mut ValueCounters = (*DI).0.Values as *mut *mut ValueProfNode;
+            let ValueCounters = (*DI).0.Values as *mut *mut ValueProfNode;
             VKI = IPVK_First as ::core::ffi::c_int as uint32_t;
             while VKI <= IPVK_Last as ::core::ffi::c_int as uint32_t {
                 CurrentVSiteCount =
@@ -168,7 +145,7 @@ pub unsafe extern "C" fn __llvm_profile_reset_counters() {
                 let mut CurrVNode = *ValueCounters.offset(i as isize);
                 while !CurrVNode.is_null() {
                     (*CurrVNode).Count = 0 as uint64_t;
-                    CurrVNode = (*CurrVNode).Next as *mut ValueProfNode;
+                    CurrVNode = (*CurrVNode).Next;
                 }
                 i = i.wrapping_add(1);
             }
