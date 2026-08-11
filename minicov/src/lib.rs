@@ -107,92 +107,23 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+#[cfg(not(nightly))]
+#[path = "profiler_placeholder.rs"]
+mod profiler_runtime;
 #[cfg(nightly)]
 mod profiler_runtime;
 
 #[cfg(feature = "alloc")]
 use alloc::vec::Vec;
-#[cfg(feature = "alloc")]
-use core::alloc::Layout;
+use core::ffi::c_void;
 use core::{fmt, slice};
 
-#[allow(non_snake_case)]
-#[repr(C)]
-struct ProfDataIOVec {
-    Data: *mut u8,
-    ElmSize: usize,
-    NumElm: usize,
-    UseZeroPadding: i32,
-}
-
-#[allow(non_snake_case)]
-#[repr(C)]
-struct ProfDataWriter {
-    Write:
-        unsafe extern "C" fn(This: *mut ProfDataWriter, *mut ProfDataIOVec, NumIOVecs: u32) -> u32,
-    WriterCtx: *mut u8,
-}
-
-// Opaque type for our purposes.
-enum VPDataReaderType {}
-
-#[cfg(nightly)]
-extern "C" {
-    fn __llvm_profile_begin_counters() -> *const u8;
-    fn __llvm_profile_end_counters() -> *const u8;
-    fn __llvm_profile_reset_counters();
-    fn __llvm_profile_merge_from_buffer(profile: *const u8, size: u64) -> i32;
-    fn __llvm_profile_check_compatibility(profile: *const u8, size: u64) -> i32;
-    fn __llvm_profile_get_version() -> u64;
-    fn lprofWriteData(
-        Writer: *mut ProfDataWriter,
-        VPDataReader: *mut VPDataReaderType,
-        SkipNameDataWrite: i32,
-    ) -> i32;
-    fn lprofGetVPDataReader() -> *mut VPDataReaderType;
-    fn lprofGetLoadModuleSignature() -> u64;
-}
-
-#[cfg(not(nightly))]
-unsafe fn __llvm_profile_begin_counters() -> *const u8 {
-    core::ptr::null()
-}
-#[cfg(not(nightly))]
-unsafe fn __llvm_profile_end_counters() -> *const u8 {
-    core::ptr::null()
-}
-#[cfg(not(nightly))]
-unsafe fn __llvm_profile_reset_counters() {}
-#[cfg(not(nightly))]
-unsafe fn __llvm_profile_merge_from_buffer(_: *const u8, _: u64) -> i32 {
-    0
-}
-#[cfg(not(nightly))]
-unsafe fn __llvm_profile_check_compatibility(_: *const u8, _: u64) -> i32 {
-    0
-}
-#[cfg(not(nightly))]
-unsafe fn __llvm_profile_get_version() -> u64 {
-    0
-}
-#[cfg(not(nightly))]
-#[allow(non_snake_case)]
-unsafe fn lprofWriteData(_: *mut ProfDataWriter, _: *mut VPDataReaderType, _: i32) -> i32 {
-    0
-}
-#[cfg(not(nightly))]
-#[allow(non_snake_case)]
-unsafe fn lprofGetVPDataReader() -> *mut VPDataReaderType {
-    core::ptr::null_mut()
-}
-#[cfg(not(nightly))]
-#[allow(non_snake_case)]
-unsafe fn lprofGetLoadModuleSignature() -> u64 {
-    0
-}
-
-const INSTR_PROF_RAW_VERSION: u64 = 11;
-const VARIANT_MASKS_ALL: u64 = 0xffffffff00000000;
+use self::profiler_runtime::{
+    __llvm_profile_begin_counters, __llvm_profile_check_compatibility, __llvm_profile_end_counters,
+    __llvm_profile_get_version, __llvm_profile_merge_from_buffer, __llvm_profile_reset_counters,
+    lprofGetLoadModuleSignature, lprofGetVPDataReader, lprofWriteData, ProfDataIOVec,
+    ProfDataWriter, INSTR_PROF_RAW_VERSION, VARIANT_MASKS_ALL,
+};
 
 // On some target rustc will insert an artificial dependency on the
 // __llvm_profile_runtime symbol to ensure the static initializer from LLVM's
@@ -200,27 +131,6 @@ const VARIANT_MASKS_ALL: u64 = 0xffffffff00000000;
 // initialization so we just provide the symbol here.
 #[no_mangle]
 static __llvm_profile_runtime: u8 = 0;
-
-// Memory allocation functions used by value profiling. If the "alloc" feature
-// is disabled then value profiling will also be disabled.
-#[cfg(feature = "alloc")]
-#[no_mangle]
-unsafe extern "C" fn minicov_alloc_zeroed(size: usize, align: usize) -> *mut u8 {
-    alloc::alloc::alloc_zeroed(Layout::from_size_align(size, align).unwrap())
-}
-#[cfg(feature = "alloc")]
-#[no_mangle]
-unsafe extern "C" fn minicov_dealloc(ptr: *mut u8, size: usize, align: usize) {
-    alloc::alloc::dealloc(ptr, Layout::from_size_align(size, align).unwrap())
-}
-#[cfg(not(feature = "alloc"))]
-#[no_mangle]
-unsafe extern "C" fn minicov_alloc_zeroed(_size: usize, _align: usize) -> *mut u8 {
-    core::ptr::null_mut()
-}
-#[cfg(not(feature = "alloc"))]
-#[no_mangle]
-unsafe extern "C" fn minicov_dealloc(_ptr: *mut u8, _size: usize, _align: usize) {}
 
 /// Sink into which coverage data can be written.
 ///
@@ -262,7 +172,7 @@ unsafe extern "C" fn write_callback<Writer: CoverageWriter>(
                 remaining -= data.len();
             }
         } else {
-            let data = slice::from_raw_parts(iov.Data, len);
+            let data = slice::from_raw_parts(iov.Data as *const u8, len);
             if writer.write(data).is_err() {
                 return 1;
             }
@@ -276,7 +186,7 @@ unsafe extern "C" fn write_callback<Writer: CoverageWriter>(
 fn check_version() {
     let version = unsafe { __llvm_profile_get_version() & !VARIANT_MASKS_ALL };
     assert_eq!(
-        version, INSTR_PROF_RAW_VERSION,
+        version, INSTR_PROF_RAW_VERSION as u64,
         "Runtime and instrumentation version mismatch"
     );
 }
@@ -310,8 +220,8 @@ pub unsafe fn capture_coverage<Writer: CoverageWriter>(
     check_version();
 
     let mut prof_writer = ProfDataWriter {
-        Write: write_callback::<Writer>,
-        WriterCtx: writer as *mut Writer as *mut u8,
+        Write: Some(write_callback::<Writer>),
+        WriterCtx: writer as *mut Writer as *mut c_void,
     };
     let res = lprofWriteData(&mut prof_writer, lprofGetVPDataReader(), 0);
     if res == 0 {
@@ -355,8 +265,8 @@ impl fmt::Display for CoverageWriteError {
 pub unsafe fn merge_coverage(data: &[u8]) -> Result<(), IncompatibleCoverageData> {
     check_version();
 
-    if __llvm_profile_check_compatibility(data.as_ptr(), data.len() as u64) == 0
-        && __llvm_profile_merge_from_buffer(data.as_ptr(), data.len() as u64) == 0
+    if __llvm_profile_check_compatibility(data.as_ptr().cast(), data.len() as u64) == 0
+        && __llvm_profile_merge_from_buffer(data.as_ptr().cast(), data.len() as u64) == 0
     {
         Ok(())
     } else {

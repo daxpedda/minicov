@@ -2,169 +2,33 @@ use core::ptr;
 
 use alloc::vec::{self, Vec};
 
-extern "C" {
-    fn initBufferWriter(BufferWriter: *mut ProfDataWriter, Buffer: *mut ::core::ffi::c_char);
-    fn __llvm_write_binary_ids(Writer: *mut ProfDataWriter) -> ::core::ffi::c_int;
-    fn __llvm_profile_is_continuous_mode_enabled() -> ::core::ffi::c_int;
-    fn __llvm_profile_begin_data() -> *const __llvm_profile_data;
-    fn __llvm_profile_end_data() -> *const __llvm_profile_data;
-    fn __llvm_profile_begin_names() -> *const ::core::ffi::c_char;
-    fn __llvm_profile_end_names() -> *const ::core::ffi::c_char;
-    fn __llvm_profile_begin_vtabnames() -> *const ::core::ffi::c_char;
-    fn __llvm_profile_end_vtabnames() -> *const ::core::ffi::c_char;
-    fn __llvm_profile_begin_counters() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_end_counters() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_begin_bitmap() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_end_bitmap() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_begin_vtables() -> *const VTableProfData;
-    fn __llvm_profile_end_vtables() -> *const VTableProfData;
-    fn __llvm_profile_get_magic() -> uint64_t;
-    fn __llvm_profile_get_version() -> uint64_t;
-    fn __llvm_profile_get_num_data(
-        Begin: *const __llvm_profile_data,
-        End: *const __llvm_profile_data,
-    ) -> uint64_t;
-    fn __llvm_profile_get_data_size(
-        Begin: *const __llvm_profile_data,
-        End: *const __llvm_profile_data,
-    ) -> uint64_t;
-    fn __llvm_profile_get_num_counters(
-        Begin: *const ::core::ffi::c_char,
-        End: *const ::core::ffi::c_char,
-    ) -> uint64_t;
-    fn __llvm_profile_get_counters_size(
-        Begin: *const ::core::ffi::c_char,
-        End: *const ::core::ffi::c_char,
-    ) -> uint64_t;
-    fn __llvm_profile_get_num_bitmap_bytes(
-        Begin: *const ::core::ffi::c_char,
-        End: *const ::core::ffi::c_char,
-    ) -> uint64_t;
-    fn __llvm_profile_get_name_size(
-        Begin: *const ::core::ffi::c_char,
-        End: *const ::core::ffi::c_char,
-    ) -> uint64_t;
-    fn __llvm_profile_get_num_vtable(
-        Begin: *const VTableProfData,
-        End: *const VTableProfData,
-    ) -> uint64_t;
-    fn __llvm_profile_get_vtable_section_size(
-        Begin: *const VTableProfData,
-        End: *const VTableProfData,
-    ) -> uint64_t;
-    fn __llvm_profile_get_padding_sizes_for_counters(
-        DataSize: uint64_t,
-        CountersSize: uint64_t,
-        NumBitmapBytes: uint64_t,
-        NumUniformCounters: uint64_t,
-        NamesSize: uint64_t,
-        VTableSize: uint64_t,
-        VNameSize: uint64_t,
-        PaddingBytesBeforeCounters: *mut uint64_t,
-        PaddingBytesAfterCounters: *mut uint64_t,
-        PaddingBytesAfterBitmap: *mut uint64_t,
-        PaddingBytesAfterUniformCounters: *mut uint64_t,
-        PaddingBytesAfterNames: *mut uint64_t,
-        PaddingBytesAfterVTable: *mut uint64_t,
-        PaddingBytesAfterVNames: *mut uint64_t,
-    ) -> ::core::ffi::c_int;
-}
+use super::InstrProfData::{
+    __llvm_profile_data, __llvm_profile_header, IPVK_Last, InstrProfValueData, VTableProfData,
+    ValueProfData, ValueProfNode, ValueProfRecord,
+};
+use super::InstrProfiling::{__llvm_profile_get_magic, __llvm_profile_get_version};
+use super::InstrProfilingBuffer::{
+    __llvm_profile_get_counters_size, __llvm_profile_get_data_size, __llvm_profile_get_name_size,
+    __llvm_profile_get_num_bitmap_bytes, __llvm_profile_get_num_counters,
+    __llvm_profile_get_num_data, __llvm_profile_get_num_vtable,
+    __llvm_profile_get_padding_sizes_for_counters, __llvm_profile_get_vtable_section_size,
+    __llvm_profile_is_continuous_mode_enabled, initBufferWriter,
+};
+use super::InstrProfilingInternal::{ProfDataIOVec, ProfDataWriter, VPDataReaderType};
+use super::InstrProfilingPlatformLinux::{
+    __llvm_profile_begin_bitmap, __llvm_profile_begin_counters, __llvm_profile_begin_data,
+    __llvm_profile_begin_names, __llvm_profile_begin_vtables, __llvm_profile_begin_vtabnames,
+    __llvm_profile_end_bitmap, __llvm_profile_end_counters, __llvm_profile_end_data,
+    __llvm_profile_end_names, __llvm_profile_end_vtables, __llvm_profile_end_vtabnames,
+    __llvm_write_binary_ids,
+};
+
 pub type size_t = usize;
 pub type uint64_t = u64;
 pub type uint32_t = u32;
-pub type uint16_t = u16;
 pub type uint8_t = u8;
 pub type uintptr_t = usize;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct InstrProfValueData {
-    pub Value: uint64_t,
-    pub Count: uint64_t,
-}
-pub type ValueKind = ::core::ffi::c_uint;
-pub const IPVK_Last: ValueKind = 2;
-pub type IntPtrT = *mut ::core::ffi::c_void;
-#[derive(Copy, Clone)]
-#[repr(C, align(8))]
-pub struct __llvm_profile_data(pub __llvm_profile_data_Inner);
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __llvm_profile_data_Inner {
-    pub NameRef: uint64_t,
-    pub FuncHash: uint64_t,
-    pub CounterPtr: IntPtrT,
-    pub UniformCounterPtr: IntPtrT,
-    pub BitmapPtr: IntPtrT,
-    pub FunctionPointer: IntPtrT,
-    pub Values: IntPtrT,
-    pub NumCounters: uint32_t,
-    pub NumValueSites: [uint16_t; 3],
-    pub OffloadDeviceWaveSize: uint16_t,
-    pub NumBitmapBytes: uint32_t,
-}
-#[allow(dead_code, non_upper_case_globals)]
-const __llvm_profile_data_PADDING: usize = ::core::mem::size_of::<__llvm_profile_data>()
-    - ::core::mem::size_of::<__llvm_profile_data_Inner>();
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __llvm_profile_header {
-    pub Magic: uint64_t,
-    pub Version: uint64_t,
-    pub BinaryIdsSize: uint64_t,
-    pub NumData: uint64_t,
-    pub PaddingBytesBeforeCounters: uint64_t,
-    pub NumCounters: uint64_t,
-    pub PaddingBytesAfterCounters: uint64_t,
-    pub NumBitmapBytes: uint64_t,
-    pub PaddingBytesAfterBitmapBytes: uint64_t,
-    pub NumUniformCounters: uint64_t,
-    pub PaddingBytesAfterUniformCounters: uint64_t,
-    pub UniformCountersDelta: uint64_t,
-    pub NamesSize: uint64_t,
-    pub CountersDelta: uint64_t,
-    pub BitmapDelta: uint64_t,
-    pub NamesDelta: uint64_t,
-    pub NumVTables: uint64_t,
-    pub VNamesSize: uint64_t,
-    pub ValueKindLast: uint64_t,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ValueProfNode {
-    pub Value: uint64_t,
-    pub Count: uint64_t,
-    pub Next: PtrToNodeT,
-}
-pub type PtrToNodeT = *mut ValueProfNode;
-#[derive(Copy, Clone)]
-#[repr(C, align(8))]
-pub struct VTableProfData(pub VTableProfData_Inner);
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct VTableProfData_Inner {
-    pub VTableNameHash: uint64_t,
-    pub VTablePointer: IntPtrT,
-    pub VTableSize: uint32_t,
-}
-#[allow(dead_code, non_upper_case_globals)]
-const VTableProfData_PADDING: usize =
-    ::core::mem::size_of::<VTableProfData>() - ::core::mem::size_of::<VTableProfData_Inner>();
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ProfDataIOVec {
-    pub Data: *const ::core::ffi::c_void,
-    pub ElmSize: size_t,
-    pub NumElm: size_t,
-    pub UseZeroPadding: ::core::ffi::c_int,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ProfDataWriter {
-    pub Write: WriterCallback,
-    pub WriterCtx: *mut ::core::ffi::c_void,
-}
-pub type WriterCallback =
-    Option<unsafe extern "C" fn(*mut ProfDataWriter, *mut ProfDataIOVec, uint32_t) -> uint32_t>;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct ProfBufferIO {
@@ -174,39 +38,7 @@ pub struct ProfBufferIO {
     pub BufferSz: uint32_t,
     pub CurOffset: uint32_t,
 }
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ValueProfData {
-    pub TotalSize: uint32_t,
-    pub NumValueKinds: uint32_t,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ValueProfRecord {
-    pub Kind: uint32_t,
-    pub NumValueSites: uint32_t,
-    pub SiteCountArray: [uint8_t; 1],
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct VPDataReaderType {
-    pub InitRTRecord:
-        Option<unsafe extern "C" fn(*const __llvm_profile_data, *mut *mut uint8_t) -> uint32_t>,
-    pub GetValueProfRecordHeaderSize: Option<unsafe extern "C" fn(uint32_t) -> uint32_t>,
-    pub GetFirstValueProfRecord:
-        Option<unsafe extern "C" fn(*mut ValueProfData) -> *mut ValueProfRecord>,
-    pub GetNumValueDataForSite: Option<unsafe extern "C" fn(uint32_t, uint32_t) -> uint32_t>,
-    pub GetValueProfDataSize: Option<unsafe extern "C" fn() -> uint32_t>,
-    pub GetValueData: Option<
-        unsafe extern "C" fn(
-            uint32_t,
-            uint32_t,
-            *mut InstrProfValueData,
-            *mut ValueProfNode,
-            uint32_t,
-        ) -> *mut ValueProfNode,
-    >,
-}
+
 #[no_mangle]
 pub static mut FreeHook: Option<unsafe extern "C" fn(*mut ::core::ffi::c_void) -> ()> = None;
 static mut TheBufferIO: ProfBufferIO = ProfBufferIO {
@@ -221,10 +53,12 @@ static mut VPDataArray: [InstrProfValueData; 16] = [InstrProfValueData { Value: 
 static mut VPDataArraySize: uint32_t = (::core::mem::size_of::<[InstrProfValueData; 16]>() as usize)
     .wrapping_div(::core::mem::size_of::<InstrProfValueData>() as usize)
     as uint32_t;
+
 #[no_mangle]
 pub static mut DynamicBufferIOBuffer: *mut uint8_t = ::core::ptr::null::<uint8_t>() as *mut uint8_t;
 #[no_mangle]
 pub static mut VPBufferSize: uint32_t = 0 as uint32_t;
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofBufferWriter(
     This: *mut ProfDataWriter,
@@ -250,7 +84,8 @@ pub unsafe extern "C" fn lprofBufferWriter(
     }
     0 as uint32_t
 }
-unsafe extern "C" fn llvmInitBufferIO(
+
+unsafe fn llvmInitBufferIO(
     BufferIO: *mut ProfBufferIO,
     FileWriter: *mut ProfDataWriter,
     Buffer: *mut uint8_t,
@@ -262,6 +97,7 @@ unsafe extern "C" fn llvmInitBufferIO(
     (*BufferIO).BufferSz = BufferSz;
     (*BufferIO).CurOffset = 0 as uint32_t;
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofCreateBufferIO(FileWriter: *mut ProfDataWriter) -> *mut ProfBufferIO {
     let mut Buffer = DynamicBufferIOBuffer;
@@ -274,6 +110,7 @@ pub unsafe extern "C" fn lprofCreateBufferIO(FileWriter: *mut ProfDataWriter) ->
     llvmInitBufferIO(&raw mut TheBufferIO, FileWriter, Buffer, BufferSize);
     &raw mut TheBufferIO
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofDeleteBufferIO(BufferIO: *mut ProfBufferIO) {
     if (*BufferIO).OwnFileWriter != 0 {
@@ -289,6 +126,7 @@ pub unsafe extern "C" fn lprofDeleteBufferIO(BufferIO: *mut ProfBufferIO) {
         VPBufferSize = 0 as uint32_t;
     }
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofBufferIOWrite(
     BufferIO: *mut ProfBufferIO,
@@ -337,6 +175,7 @@ pub unsafe extern "C" fn lprofBufferIOWrite(
     }
     0 as ::core::ffi::c_int
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofBufferIOFlush(BufferIO: *mut ProfBufferIO) -> ::core::ffi::c_int {
     if (*BufferIO).CurOffset != 0 {
@@ -360,7 +199,8 @@ pub unsafe extern "C" fn lprofBufferIOFlush(BufferIO: *mut ProfBufferIO) -> ::co
     }
     0 as ::core::ffi::c_int
 }
-unsafe extern "C" fn writeOneValueProfData(
+
+unsafe fn writeOneValueProfData(
     BufferIO: *mut ProfBufferIO,
     VPDataReader: *mut VPDataReaderType,
     Data: *const __llvm_profile_data,
@@ -502,7 +342,8 @@ unsafe extern "C" fn writeOneValueProfData(
     }
     0 as ::core::ffi::c_int
 }
-unsafe extern "C" fn writeValueProfData(
+
+unsafe fn writeValueProfData(
     Writer: *mut ProfDataWriter,
     VPDataReader: *mut VPDataReaderType,
     DataBegin: *const __llvm_profile_data,
@@ -526,6 +367,7 @@ unsafe extern "C" fn writeValueProfData(
     lprofDeleteBufferIO(BufferIO);
     0 as ::core::ffi::c_int
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofWriteData(
     Writer: *mut ProfDataWriter,
@@ -566,6 +408,7 @@ pub unsafe extern "C" fn lprofWriteData(
         Version,
     )
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofWriteDataImpl(
     Writer: *mut ProfDataWriter,
@@ -827,6 +670,7 @@ pub unsafe extern "C" fn lprofWriteDataImpl(
     }
     writeValueProfData(Writer, VPDataReader, DataBegin, DataEnd)
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofWriteOneBinaryId(
     Writer: *mut ProfDataWriter,

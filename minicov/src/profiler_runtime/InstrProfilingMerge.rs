@@ -1,123 +1,26 @@
-extern "C" {
-    fn lprofMergeValueProfData(
-        SrcValueProfData: *mut ValueProfData,
-        DstData: *mut __llvm_profile_data,
-    );
-    fn __llvm_profile_get_num_padding_bytes(SizeInBytes: uint64_t) -> uint8_t;
-    fn __llvm_profile_begin_data() -> *const __llvm_profile_data;
-    fn __llvm_profile_end_data() -> *const __llvm_profile_data;
-    fn __llvm_profile_begin_names() -> *const ::core::ffi::c_char;
-    fn __llvm_profile_end_names() -> *const ::core::ffi::c_char;
-    fn __llvm_profile_begin_counters() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_end_counters() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_begin_bitmap() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_end_bitmap() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_begin_vnodes() -> *mut ValueProfNode;
-    fn __llvm_profile_end_vnodes() -> *mut ValueProfNode;
-    fn __llvm_profile_get_magic() -> uint64_t;
-    fn __llvm_profile_get_version() -> uint64_t;
-    fn __llvm_profile_get_num_data(
-        Begin: *const __llvm_profile_data,
-        End: *const __llvm_profile_data,
-    ) -> uint64_t;
-    fn __llvm_profile_counter_entry_size() -> size_t;
-    fn __llvm_profile_get_num_counters(
-        Begin: *const ::core::ffi::c_char,
-        End: *const ::core::ffi::c_char,
-    ) -> uint64_t;
-    fn __llvm_profile_get_num_bitmap_bytes(
-        Begin: *const ::core::ffi::c_char,
-        End: *const ::core::ffi::c_char,
-    ) -> uint64_t;
-    fn __llvm_profile_get_name_size(
-        Begin: *const ::core::ffi::c_char,
-        End: *const ::core::ffi::c_char,
-    ) -> uint64_t;
-}
-pub type size_t = usize;
+use super::InstrProfData::{
+    __llvm_profile_data, __llvm_profile_header, IPVK_Last, VTableProfData, ValueProfData,
+    VARIANT_MASK_BYTE_COVERAGE, VARIANT_MASK_TEMPORAL_PROF,
+};
+use super::InstrProfiling::{
+    __llvm_profile_get_magic, __llvm_profile_get_num_padding_bytes, __llvm_profile_get_version,
+};
+use super::InstrProfilingBuffer::{
+    __llvm_profile_counter_entry_size, __llvm_profile_get_name_size,
+    __llvm_profile_get_num_bitmap_bytes, __llvm_profile_get_num_counters,
+    __llvm_profile_get_num_data,
+};
+use super::InstrProfilingMergeFile::lprofMergeValueProfData;
+use super::InstrProfilingPlatformLinux::{
+    __llvm_profile_begin_bitmap, __llvm_profile_begin_counters, __llvm_profile_begin_data,
+    __llvm_profile_begin_names, __llvm_profile_begin_vnodes, __llvm_profile_end_bitmap,
+    __llvm_profile_end_counters, __llvm_profile_end_data, __llvm_profile_end_names,
+    __llvm_profile_end_vnodes,
+};
+
 pub type uint64_t = u64;
-pub type uint32_t = u32;
-pub type uint16_t = u16;
-pub type uint8_t = u8;
 pub type uintptr_t = usize;
-pub type ValueKind = ::core::ffi::c_uint;
-pub const IPVK_Last: ValueKind = 2;
-pub type IntPtrT = *mut ::core::ffi::c_void;
-#[derive(Copy, Clone)]
-#[repr(C, align(8))]
-pub struct __llvm_profile_data(pub __llvm_profile_data_Inner);
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __llvm_profile_data_Inner {
-    pub NameRef: uint64_t,
-    pub FuncHash: uint64_t,
-    pub CounterPtr: IntPtrT,
-    pub UniformCounterPtr: IntPtrT,
-    pub BitmapPtr: IntPtrT,
-    pub FunctionPointer: IntPtrT,
-    pub Values: IntPtrT,
-    pub NumCounters: uint32_t,
-    pub NumValueSites: [uint16_t; 3],
-    pub OffloadDeviceWaveSize: uint16_t,
-    pub NumBitmapBytes: uint32_t,
-}
-#[allow(dead_code, non_upper_case_globals)]
-const __llvm_profile_data_PADDING: usize = ::core::mem::size_of::<__llvm_profile_data>()
-    - ::core::mem::size_of::<__llvm_profile_data_Inner>();
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __llvm_profile_header {
-    pub Magic: uint64_t,
-    pub Version: uint64_t,
-    pub BinaryIdsSize: uint64_t,
-    pub NumData: uint64_t,
-    pub PaddingBytesBeforeCounters: uint64_t,
-    pub NumCounters: uint64_t,
-    pub PaddingBytesAfterCounters: uint64_t,
-    pub NumBitmapBytes: uint64_t,
-    pub PaddingBytesAfterBitmapBytes: uint64_t,
-    pub NumUniformCounters: uint64_t,
-    pub PaddingBytesAfterUniformCounters: uint64_t,
-    pub UniformCountersDelta: uint64_t,
-    pub NamesSize: uint64_t,
-    pub CountersDelta: uint64_t,
-    pub BitmapDelta: uint64_t,
-    pub NamesDelta: uint64_t,
-    pub NumVTables: uint64_t,
-    pub VNamesSize: uint64_t,
-    pub ValueKindLast: uint64_t,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ValueProfNode {
-    pub Value: uint64_t,
-    pub Count: uint64_t,
-    pub Next: PtrToNodeT,
-}
-pub type PtrToNodeT = *mut ValueProfNode;
-#[derive(Copy, Clone)]
-#[repr(C, align(8))]
-pub struct VTableProfData(pub VTableProfData_Inner);
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct VTableProfData_Inner {
-    pub VTableNameHash: uint64_t,
-    pub VTablePointer: IntPtrT,
-    pub VTableSize: uint32_t,
-}
-#[allow(dead_code, non_upper_case_globals)]
-const VTableProfData_PADDING: usize =
-    ::core::mem::size_of::<VTableProfData>() - ::core::mem::size_of::<VTableProfData_Inner>();
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ValueProfData {
-    pub TotalSize: uint32_t,
-    pub NumValueKinds: uint32_t,
-}
-pub const VARIANT_MASK_BYTE_COVERAGE: ::core::ffi::c_ulonglong =
-    (0x1 as ::core::ffi::c_ulonglong) << 60 as ::core::ffi::c_int;
-pub const VARIANT_MASK_TEMPORAL_PROF: ::core::ffi::c_ulonglong =
-    (0x1 as ::core::ffi::c_ulonglong) << 63 as ::core::ffi::c_int;
+
 #[no_mangle]
 pub static VPMergeHook: Option<
     unsafe extern "C" fn(*mut ValueProfData, *mut __llvm_profile_data) -> (),
@@ -151,6 +54,7 @@ pub unsafe extern "C" fn lprofGetLoadModuleSignature() -> uint64_t {
         .wrapping_add(Version)
         .wrapping_add(__llvm_profile_get_magic())
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_check_compatibility(
     ProfileData: *const ::core::ffi::c_char,
@@ -223,12 +127,12 @@ pub unsafe extern "C" fn __llvm_profile_check_compatibility(
     }
     0 as ::core::ffi::c_int
 }
-unsafe extern "C" fn signextIfWin64(V: *mut ::core::ffi::c_void) -> uintptr_t {
+
+unsafe fn signextIfWin64(V: *mut ::core::ffi::c_void) -> uintptr_t {
     V as uintptr_t
 }
-unsafe extern "C" fn getDistanceFromCounterToValueProf(
-    Header: *const __llvm_profile_header,
-) -> uint64_t {
+
+unsafe fn getDistanceFromCounterToValueProf(Header: *const __llvm_profile_header) -> uint64_t {
     let VTableSectionSize: uint64_t = (*Header)
         .NumVTables
         .wrapping_mul(::core::mem::size_of::<VTableProfData>() as uint64_t);
@@ -245,6 +149,7 @@ unsafe extern "C" fn getDistanceFromCounterToValueProf(
         .wrapping_add(VNamesSize)
         .wrapping_add(PaddingBytesAfterVNamesSize)
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_merge_from_buffer(
     ProfileData: *const ::core::ffi::c_char,

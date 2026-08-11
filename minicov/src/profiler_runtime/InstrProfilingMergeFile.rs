@@ -1,59 +1,12 @@
-extern "C" {
-    fn getFirstValueProfRecord(VPD: *mut ValueProfData) -> *mut ValueProfRecord;
-    fn getValueProfRecordNext(VPR: *mut ValueProfRecord) -> *mut ValueProfRecord;
-    fn getValueProfRecordValueData(VPR: *mut ValueProfRecord) -> *mut InstrProfValueData;
-    fn __llvm_profile_instrument_target_value(
-        TargetValue: uint64_t,
-        Data: *mut ::core::ffi::c_void,
-        CounterIndex: uint32_t,
-        CounterValue: uint64_t,
-    );
-}
-pub type uint64_t = u64;
+use super::InstrProfData::{
+    __llvm_profile_data, getFirstValueProfRecord, getValueProfRecordNext,
+    getValueProfRecordValueData, InstrProfValueData, ValueProfData,
+};
+use super::InstrProfilingValue::__llvm_profile_instrument_target_value;
+
 pub type uint32_t = u32;
-pub type uint16_t = u16;
 pub type uint8_t = u8;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct InstrProfValueData {
-    pub Value: uint64_t,
-    pub Count: uint64_t,
-}
-pub type IntPtrT = *mut ::core::ffi::c_void;
-#[derive(Copy, Clone)]
-#[repr(C, align(8))]
-pub struct __llvm_profile_data(pub __llvm_profile_data_Inner);
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __llvm_profile_data_Inner {
-    pub NameRef: uint64_t,
-    pub FuncHash: uint64_t,
-    pub CounterPtr: IntPtrT,
-    pub UniformCounterPtr: IntPtrT,
-    pub BitmapPtr: IntPtrT,
-    pub FunctionPointer: IntPtrT,
-    pub Values: IntPtrT,
-    pub NumCounters: uint32_t,
-    pub NumValueSites: [uint16_t; 3],
-    pub OffloadDeviceWaveSize: uint16_t,
-    pub NumBitmapBytes: uint32_t,
-}
-#[allow(dead_code, non_upper_case_globals)]
-const __llvm_profile_data_PADDING: usize = ::core::mem::size_of::<__llvm_profile_data>()
-    - ::core::mem::size_of::<__llvm_profile_data_Inner>();
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ValueProfData {
-    pub TotalSize: uint32_t,
-    pub NumValueKinds: uint32_t,
-}
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ValueProfRecord {
-    pub Kind: uint32_t,
-    pub NumValueSites: uint32_t,
-    pub SiteCountArray: [uint8_t; 1],
-}
+
 #[no_mangle]
 pub unsafe extern "C" fn lprofMergeValueProfData(
     SrcValueProfData: *mut ValueProfData,

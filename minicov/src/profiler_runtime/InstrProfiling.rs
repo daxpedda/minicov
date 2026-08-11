@@ -1,57 +1,22 @@
 use core::ptr;
 
-extern "C" {
-    fn lprofSetProfileDumped(_: ::core::ffi::c_uint);
-    fn __llvm_profile_begin_data() -> *const __llvm_profile_data;
-    fn __llvm_profile_end_data() -> *const __llvm_profile_data;
-    fn __llvm_profile_begin_counters() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_end_counters() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_begin_bitmap() -> *mut ::core::ffi::c_char;
-    fn __llvm_profile_end_bitmap() -> *mut ::core::ffi::c_char;
-    static mut __llvm_profile_raw_version: uint64_t;
-}
+use super::InstrProfData::{
+    __llvm_profile_data, IPVK_First, IPVK_Last, ValueProfNode, VARIANT_MASK_BYTE_COVERAGE,
+    VARIANT_MASK_TEMPORAL_PROF,
+};
+use super::InstrProfilingInternal::lprofSetProfileDumped;
+use super::InstrProfilingPlatformLinux::{
+    __llvm_profile_begin_bitmap, __llvm_profile_begin_counters, __llvm_profile_begin_data,
+    __llvm_profile_end_bitmap, __llvm_profile_end_counters, __llvm_profile_end_data,
+};
+use super::InstrProfilingVersionVar::__llvm_profile_raw_version;
+
 pub type uint64_t = u64;
 pub type uint32_t = u32;
-pub type uint16_t = u16;
 pub type uint8_t = u8;
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct ValueProfNode {
-    pub Value: uint64_t,
-    pub Count: uint64_t,
-    pub Next: PtrToNodeT,
-}
-pub type PtrToNodeT = *mut ValueProfNode;
-pub type IntPtrT = *mut ::core::ffi::c_void;
-#[derive(Copy, Clone)]
-#[repr(C, align(8))]
-pub struct __llvm_profile_data(pub __llvm_profile_data_Inner);
-#[derive(Copy, Clone)]
-#[repr(C)]
-pub struct __llvm_profile_data_Inner {
-    pub NameRef: uint64_t,
-    pub FuncHash: uint64_t,
-    pub CounterPtr: IntPtrT,
-    pub UniformCounterPtr: IntPtrT,
-    pub BitmapPtr: IntPtrT,
-    pub FunctionPointer: IntPtrT,
-    pub Values: IntPtrT,
-    pub NumCounters: uint32_t,
-    pub NumValueSites: [uint16_t; 3],
-    pub OffloadDeviceWaveSize: uint16_t,
-    pub NumBitmapBytes: uint32_t,
-}
-#[allow(dead_code, non_upper_case_globals)]
-const __llvm_profile_data_PADDING: usize = ::core::mem::size_of::<__llvm_profile_data>()
-    - ::core::mem::size_of::<__llvm_profile_data_Inner>();
-pub const IPVK_Last: ValueKind = 2;
-pub const IPVK_First: ValueKind = 0;
-pub type ValueKind = ::core::ffi::c_uint;
-pub const VARIANT_MASK_BYTE_COVERAGE: ::core::ffi::c_ulonglong =
-    (0x1 as ::core::ffi::c_ulonglong) << 60 as ::core::ffi::c_int;
-pub const VARIANT_MASK_TEMPORAL_PROF: ::core::ffi::c_ulonglong =
-    (0x1 as ::core::ffi::c_ulonglong) << 63 as ::core::ffi::c_int;
+
 static mut __llvm_profile_global_timestamp: uint32_t = 1 as uint32_t;
+
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_set_timestamp(Probe: *mut uint64_t) {
     if *Probe == 0 as uint64_t || *Probe == -(1 as ::core::ffi::c_int) as uint64_t {
@@ -60,6 +25,7 @@ pub unsafe extern "C" fn __llvm_profile_set_timestamp(Probe: *mut uint64_t) {
         *Probe = fresh0 as uint64_t;
     }
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_get_magic() -> uint64_t {
     if ::core::mem::size_of::<*mut ::core::ffi::c_void>() as usize
@@ -84,10 +50,12 @@ pub unsafe extern "C" fn __llvm_profile_get_magic() -> uint64_t {
             | 129 as ::core::ffi::c_int as uint64_t
     }
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_set_dumped() {
     lprofSetProfileDumped(1 as ::core::ffi::c_uint);
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_get_num_padding_bytes(SizeInBytes: uint64_t) -> uint8_t {
     (7 as uint64_t
@@ -95,10 +63,12 @@ pub unsafe extern "C" fn __llvm_profile_get_num_padding_bytes(SizeInBytes: uint6
             .wrapping_sub(SizeInBytes.wrapping_rem(::core::mem::size_of::<uint64_t>() as uint64_t)))
         as uint8_t
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_get_version() -> uint64_t {
     __llvm_profile_raw_version
 }
+
 #[no_mangle]
 pub unsafe extern "C" fn __llvm_profile_reset_counters() {
     if __llvm_profile_get_version() & VARIANT_MASK_TEMPORAL_PROF as uint64_t != 0 {
