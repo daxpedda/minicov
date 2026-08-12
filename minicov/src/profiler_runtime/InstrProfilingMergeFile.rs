@@ -7,7 +7,6 @@ use super::InstrProfilingValue::__llvm_profile_instrument_target_value;
 pub type uint32_t = u32;
 pub type uint8_t = u8;
 
-#[no_mangle]
 pub unsafe extern "C" fn lprofMergeValueProfData(
     SrcValueProfData: *mut ValueProfData,
     DstData: *mut __llvm_profile_data,

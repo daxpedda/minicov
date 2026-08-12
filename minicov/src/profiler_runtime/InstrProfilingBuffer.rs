@@ -23,28 +23,23 @@ pub type intptr_t = isize;
 static mut ContinuouslySyncProfile: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
 static mut PageSize: ::core::ffi::c_uint = 0 as ::core::ffi::c_uint;
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_is_continuous_mode_enabled() -> ::core::ffi::c_int {
+pub unsafe fn __llvm_profile_is_continuous_mode_enabled() -> ::core::ffi::c_int {
     (ContinuouslySyncProfile != 0 && PageSize != 0) as ::core::ffi::c_int
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_enable_continuous_mode() {
+pub unsafe fn __llvm_profile_enable_continuous_mode() {
     ContinuouslySyncProfile = 1 as ::core::ffi::c_int;
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_disable_continuous_mode() {
+pub unsafe fn __llvm_profile_disable_continuous_mode() {
     ContinuouslySyncProfile = 0 as ::core::ffi::c_int;
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_set_page_size(PS: ::core::ffi::c_uint) {
+pub unsafe fn __llvm_profile_set_page_size(PS: ::core::ffi::c_uint) {
     PageSize = PS;
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_size_for_buffer() -> uint64_t {
+pub unsafe fn __llvm_profile_get_size_for_buffer() -> uint64_t {
     let DataBegin = __llvm_profile_begin_data();
     let DataEnd = __llvm_profile_end_data();
     let CountersBegin: *const ::core::ffi::c_char = __llvm_profile_begin_counters();
@@ -73,8 +68,7 @@ pub unsafe extern "C" fn __llvm_profile_get_size_for_buffer() -> uint64_t {
     )
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_num_data(
+pub unsafe fn __llvm_profile_get_num_data(
     Begin: *const __llvm_profile_data,
     End: *const __llvm_profile_data,
 ) -> uint64_t {
@@ -87,8 +81,7 @@ pub unsafe extern "C" fn __llvm_profile_get_num_data(
         .wrapping_div(::core::mem::size_of::<__llvm_profile_data>() as usize) as uint64_t
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_data_size(
+pub unsafe fn __llvm_profile_get_data_size(
     Begin: *const __llvm_profile_data,
     End: *const __llvm_profile_data,
 ) -> uint64_t {
@@ -96,8 +89,7 @@ pub unsafe extern "C" fn __llvm_profile_get_data_size(
         .wrapping_mul(::core::mem::size_of::<__llvm_profile_data>() as uint64_t)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_num_vtable(
+pub unsafe fn __llvm_profile_get_num_vtable(
     Begin: *const VTableProfData,
     End: *const VTableProfData,
 ) -> uint64_t {
@@ -107,24 +99,21 @@ pub unsafe extern "C" fn __llvm_profile_get_num_vtable(
         as uint64_t
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_vtable_section_size(
+pub unsafe fn __llvm_profile_get_vtable_section_size(
     Begin: *const VTableProfData,
     End: *const VTableProfData,
 ) -> uint64_t {
     (End as intptr_t - Begin as intptr_t) as uint64_t
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_counter_entry_size() -> size_t {
+pub unsafe fn __llvm_profile_counter_entry_size() -> size_t {
     if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as uint64_t != 0 {
         return ::core::mem::size_of::<uint8_t>() as size_t;
     }
     ::core::mem::size_of::<uint64_t>() as size_t
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_num_counters(
+pub unsafe fn __llvm_profile_get_num_counters(
     Begin: *const ::core::ffi::c_char,
     End: *const ::core::ffi::c_char,
 ) -> uint64_t {
@@ -137,8 +126,7 @@ pub unsafe extern "C" fn __llvm_profile_get_num_counters(
         .wrapping_div(__llvm_profile_counter_entry_size()) as uint64_t
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_counters_size(
+pub unsafe fn __llvm_profile_get_counters_size(
     Begin: *const ::core::ffi::c_char,
     End: *const ::core::ffi::c_char,
 ) -> uint64_t {
@@ -146,16 +134,14 @@ pub unsafe extern "C" fn __llvm_profile_get_counters_size(
         .wrapping_mul(__llvm_profile_counter_entry_size() as uint64_t)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_num_bitmap_bytes(
+pub unsafe fn __llvm_profile_get_num_bitmap_bytes(
     Begin: *const ::core::ffi::c_char,
     End: *const ::core::ffi::c_char,
 ) -> uint64_t {
     End.offset_from(Begin) as ::core::ffi::c_long as uint64_t
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_name_size(
+pub unsafe fn __llvm_profile_get_name_size(
     Begin: *const ::core::ffi::c_char,
     End: *const ::core::ffi::c_char,
 ) -> uint64_t {
@@ -174,8 +160,8 @@ unsafe fn needsCounterPadding() -> ::core::ffi::c_int {
     0 as ::core::ffi::c_int
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_padding_sizes_for_counters(
+#[expect(clippy::too_many_arguments)]
+pub unsafe fn __llvm_profile_get_padding_sizes_for_counters(
     DataSize: uint64_t,
     CountersSize: uint64_t,
     NumBitmapBytes: uint64_t,
@@ -231,8 +217,8 @@ pub unsafe extern "C" fn __llvm_profile_get_padding_sizes_for_counters(
     0 as ::core::ffi::c_int
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_get_size_for_buffer_internal(
+#[expect(clippy::too_many_arguments)]
+pub unsafe fn __llvm_profile_get_size_for_buffer_internal(
     DataBegin: *const __llvm_profile_data,
     DataEnd: *const __llvm_profile_data,
     CountersBegin: *const ::core::ffi::c_char,
@@ -295,8 +281,7 @@ pub unsafe extern "C" fn __llvm_profile_get_size_for_buffer_internal(
         .wrapping_add(PaddingBytesAfterVNames)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn initBufferWriter(
+pub unsafe fn initBufferWriter(
     BufferWriter: *mut ProfDataWriter,
     Buffer: *mut ::core::ffi::c_char,
 ) {
@@ -307,10 +292,7 @@ pub unsafe extern "C" fn initBufferWriter(
     (*BufferWriter).WriterCtx = Buffer as *mut ::core::ffi::c_void;
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_write_buffer(
-    Buffer: *mut ::core::ffi::c_char,
-) -> ::core::ffi::c_int {
+pub unsafe fn __llvm_profile_write_buffer(Buffer: *mut ::core::ffi::c_char) -> ::core::ffi::c_int {
     let mut BufferWriter = ProfDataWriter {
         Write: None,
         WriterCtx: ::core::ptr::null_mut::<::core::ffi::c_void>(),
@@ -323,8 +305,8 @@ pub unsafe extern "C" fn __llvm_profile_write_buffer(
     )
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_write_buffer_internal(
+#[expect(clippy::too_many_arguments)]
+pub unsafe fn __llvm_profile_write_buffer_internal(
     Buffer: *mut ::core::ffi::c_char,
     DataBegin: *const __llvm_profile_data,
     DataEnd: *const __llvm_profile_data,

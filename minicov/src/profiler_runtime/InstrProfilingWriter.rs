@@ -39,7 +39,6 @@ pub struct ProfBufferIO {
     pub CurOffset: uint32_t,
 }
 
-#[no_mangle]
 pub static mut FreeHook: Option<unsafe extern "C" fn(*mut ::core::ffi::c_void) -> ()> = None;
 static mut TheBufferIO: ProfBufferIO = ProfBufferIO {
     FileWriter: ::core::ptr::null::<ProfDataWriter>() as *mut ProfDataWriter,
@@ -54,12 +53,9 @@ static mut VPDataArraySize: uint32_t = (::core::mem::size_of::<[InstrProfValueDa
     .wrapping_div(::core::mem::size_of::<InstrProfValueData>() as usize)
     as uint32_t;
 
-#[no_mangle]
 pub static mut DynamicBufferIOBuffer: *mut uint8_t = ::core::ptr::null::<uint8_t>() as *mut uint8_t;
-#[no_mangle]
 pub static mut VPBufferSize: uint32_t = 0 as uint32_t;
 
-#[no_mangle]
 pub unsafe extern "C" fn lprofBufferWriter(
     This: *mut ProfDataWriter,
     IOVecs: *mut ProfDataIOVec,
@@ -98,8 +94,7 @@ unsafe fn llvmInitBufferIO(
     (*BufferIO).CurOffset = 0 as uint32_t;
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn lprofCreateBufferIO(FileWriter: *mut ProfDataWriter) -> *mut ProfBufferIO {
+pub unsafe fn lprofCreateBufferIO(FileWriter: *mut ProfDataWriter) -> *mut ProfBufferIO {
     let mut Buffer = DynamicBufferIOBuffer;
     let mut BufferSize: uint32_t = VPBufferSize;
     if Buffer.is_null() {
@@ -111,8 +106,7 @@ pub unsafe extern "C" fn lprofCreateBufferIO(FileWriter: *mut ProfDataWriter) ->
     &raw mut TheBufferIO
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn lprofDeleteBufferIO(BufferIO: *mut ProfBufferIO) {
+pub unsafe fn lprofDeleteBufferIO(BufferIO: *mut ProfBufferIO) {
     if (*BufferIO).OwnFileWriter != 0 {
         FreeHook.expect("non-null function pointer")(
             (*BufferIO).FileWriter as *mut ::core::ffi::c_void,
@@ -127,8 +121,7 @@ pub unsafe extern "C" fn lprofDeleteBufferIO(BufferIO: *mut ProfBufferIO) {
     }
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn lprofBufferIOWrite(
+pub unsafe fn lprofBufferIOWrite(
     BufferIO: *mut ProfBufferIO,
     Data: *const uint8_t,
     Size: uint32_t,
@@ -176,8 +169,7 @@ pub unsafe extern "C" fn lprofBufferIOWrite(
     0 as ::core::ffi::c_int
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn lprofBufferIOFlush(BufferIO: *mut ProfBufferIO) -> ::core::ffi::c_int {
+pub unsafe fn lprofBufferIOFlush(BufferIO: *mut ProfBufferIO) -> ::core::ffi::c_int {
     if (*BufferIO).CurOffset != 0 {
         let mut IO: [ProfDataIOVec; 1] = [ProfDataIOVec {
             Data: (*BufferIO).BufferStart as *const ::core::ffi::c_void,
@@ -368,8 +360,7 @@ unsafe fn writeValueProfData(
     0 as ::core::ffi::c_int
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn lprofWriteData(
+pub unsafe fn lprofWriteData(
     Writer: *mut ProfDataWriter,
     VPDataReader: *mut VPDataReaderType,
     SkipNameDataWrite: ::core::ffi::c_int,
@@ -409,8 +400,8 @@ pub unsafe extern "C" fn lprofWriteData(
     )
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn lprofWriteDataImpl(
+#[expect(clippy::too_many_arguments)]
+pub unsafe fn lprofWriteDataImpl(
     Writer: *mut ProfDataWriter,
     DataBegin: *const __llvm_profile_data,
     DataEnd: *const __llvm_profile_data,
@@ -669,43 +660,4 @@ pub unsafe extern "C" fn lprofWriteDataImpl(
         return 0 as ::core::ffi::c_int;
     }
     writeValueProfData(Writer, VPDataReader, DataBegin, DataEnd)
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn lprofWriteOneBinaryId(
-    Writer: *mut ProfDataWriter,
-    mut BinaryIdLen: uint64_t,
-    BinaryIdData: *const uint8_t,
-    BinaryIdPadding: uint64_t,
-) -> ::core::ffi::c_int {
-    let mut BinaryIdIOVec: [ProfDataIOVec; 3] = [
-        ProfDataIOVec {
-            Data: &raw mut BinaryIdLen as *const ::core::ffi::c_void,
-            ElmSize: ::core::mem::size_of::<uint64_t>() as size_t,
-            NumElm: 1 as size_t,
-            UseZeroPadding: 0 as ::core::ffi::c_int,
-        },
-        ProfDataIOVec {
-            Data: BinaryIdData as *const ::core::ffi::c_void,
-            ElmSize: ::core::mem::size_of::<uint8_t>() as size_t,
-            NumElm: BinaryIdLen as size_t,
-            UseZeroPadding: 0 as ::core::ffi::c_int,
-        },
-        ProfDataIOVec {
-            Data: ::core::ptr::null::<::core::ffi::c_void>(),
-            ElmSize: ::core::mem::size_of::<uint8_t>() as size_t,
-            NumElm: BinaryIdPadding as size_t,
-            UseZeroPadding: 1 as ::core::ffi::c_int,
-        },
-    ];
-    if (*Writer).Write.expect("non-null function pointer")(
-        Writer,
-        &raw mut BinaryIdIOVec as *mut ProfDataIOVec,
-        (::core::mem::size_of::<[ProfDataIOVec; 3]>() as usize)
-            .wrapping_div(::core::mem::size_of::<ProfDataIOVec>() as usize) as uint32_t,
-    ) != 0
-    {
-        return -(1 as ::core::ffi::c_int);
-    }
-    0 as ::core::ffi::c_int
 }

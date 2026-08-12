@@ -21,14 +21,13 @@ use super::InstrProfilingPlatformLinux::{
 pub type uint64_t = u64;
 pub type uintptr_t = usize;
 
-#[no_mangle]
 pub static VPMergeHook: Option<
     unsafe extern "C" fn(*mut ValueProfData, *mut __llvm_profile_data) -> (),
 > = Some(
     lprofMergeValueProfData
         as unsafe extern "C" fn(*mut ValueProfData, *mut __llvm_profile_data) -> (),
 );
-#[no_mangle]
+
 pub unsafe extern "C" fn lprofGetLoadModuleSignature() -> uint64_t {
     let Version = __llvm_profile_get_version();
     let NumCounters = __llvm_profile_get_num_counters(
@@ -55,8 +54,7 @@ pub unsafe extern "C" fn lprofGetLoadModuleSignature() -> uint64_t {
         .wrapping_add(__llvm_profile_get_magic())
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_check_compatibility(
+pub unsafe fn __llvm_profile_check_compatibility(
     ProfileData: *const ::core::ffi::c_char,
     ProfileSize: uint64_t,
 ) -> ::core::ffi::c_int {
@@ -150,8 +148,7 @@ unsafe fn getDistanceFromCounterToValueProf(Header: *const __llvm_profile_header
         .wrapping_add(PaddingBytesAfterVNamesSize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_merge_from_buffer(
+pub unsafe fn __llvm_profile_merge_from_buffer(
     ProfileData: *const ::core::ffi::c_char,
     ProfileSize: uint64_t,
 ) -> ::core::ffi::c_int {

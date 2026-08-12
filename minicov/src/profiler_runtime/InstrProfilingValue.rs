@@ -27,28 +27,16 @@ static mut OutOfNodesWarnings: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
 static mut hasNonDefaultValsPerSite: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
 pub const INSTR_PROF_DEFAULT_NUM_VAL_PER_SITE: ::core::ffi::c_int = 24 as ::core::ffi::c_int;
 
-#[no_mangle]
+#[used]
 #[link_section = "__llvm_prf_vnds"]
 pub static mut lprofValueProfNodes: [ValueProfNode; 1024] = [ValueProfNode {
     Value: 0,
     Count: 0,
     Next: ::core::ptr::null::<ValueProfNode>() as *mut ValueProfNode,
 }; 1024];
-
-#[no_mangle]
 pub static mut VPMaxNumValsPerSite: uint32_t = INSTR_PROF_DEFAULT_NUM_VAL_PER_SITE as uint32_t;
 
-#[no_mangle]
-pub unsafe extern "C" fn lprofSetupValueProfiler() {}
-
-#[no_mangle]
-pub unsafe extern "C" fn lprofSetMaxValsPerSite(MaxVals: uint32_t) {
-    VPMaxNumValsPerSite = MaxVals;
-    hasNonDefaultValsPerSite = 1 as ::core::ffi::c_int;
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_set_num_value_sites(
+pub unsafe fn __llvm_profile_set_num_value_sites(
     Data: *mut __llvm_profile_data,
     ValueKind: uint32_t,
     NumValueSites: uint16_t,
@@ -57,15 +45,13 @@ pub unsafe extern "C" fn __llvm_profile_set_num_value_sites(
         as *const uint16_t as *mut uint16_t) = NumValueSites;
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_iterate_data(
+pub unsafe fn __llvm_profile_iterate_data(
     Data: *const __llvm_profile_data,
 ) -> *const __llvm_profile_data {
     Data.offset(1 as ::core::ffi::c_int as isize)
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_get_function_addr(
+pub unsafe fn __llvm_get_function_addr(
     Data: *const __llvm_profile_data,
 ) -> *mut ::core::ffi::c_void {
     (*Data).0.FunctionPointer
@@ -216,8 +202,7 @@ pub unsafe extern "C" fn __llvm_profile_instrument_target(
     instrumentTargetValueImpl(TargetValue, Data, CounterIndex, 1 as uint64_t);
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn __llvm_profile_instrument_target_value(
+pub unsafe fn __llvm_profile_instrument_target_value(
     TargetValue: uint64_t,
     Data: *mut ::core::ffi::c_void,
     CounterIndex: uint32_t,
@@ -412,7 +397,6 @@ static mut TheVPDataReader: VPDataReaderType = {
     }
 };
 
-#[no_mangle]
-pub unsafe extern "C" fn lprofGetVPDataReader() -> *mut VPDataReaderType {
+pub unsafe fn lprofGetVPDataReader() -> *mut VPDataReaderType {
     &raw mut TheVPDataReader
 }

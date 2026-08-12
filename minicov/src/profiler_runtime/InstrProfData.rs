@@ -134,27 +134,19 @@ pub unsafe extern "C" fn getValueProfRecordHeaderSize(NumValueSites: uint32_t) -
     Size
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn getValueProfRecordSize(
-    NumValueSites: uint32_t,
-    NumValueData: uint32_t,
-) -> uint32_t {
+pub unsafe fn getValueProfRecordSize(NumValueSites: uint32_t, NumValueData: uint32_t) -> uint32_t {
     (getValueProfRecordHeaderSize(NumValueSites) as usize).wrapping_add(
         (::core::mem::size_of::<InstrProfValueData>() as usize).wrapping_mul(NumValueData as usize),
     ) as uint32_t
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn getValueProfRecordValueData(
-    This: *mut ValueProfRecord,
-) -> *mut InstrProfValueData {
+pub unsafe fn getValueProfRecordValueData(This: *mut ValueProfRecord) -> *mut InstrProfValueData {
     (This as *mut ::core::ffi::c_char)
         .offset(getValueProfRecordHeaderSize((*This).NumValueSites) as isize)
         as *mut InstrProfValueData
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn getValueProfRecordNumValueData(This: *mut ValueProfRecord) -> uint32_t {
+pub unsafe fn getValueProfRecordNumValueData(This: *mut ValueProfRecord) -> uint32_t {
     let mut NumValueData: uint32_t = 0 as uint32_t;
     let mut I: uint32_t;
     I = 0 as uint32_t;
@@ -167,10 +159,7 @@ pub unsafe extern "C" fn getValueProfRecordNumValueData(This: *mut ValueProfReco
     NumValueData
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn getValueProfRecordNext(
-    This: *mut ValueProfRecord,
-) -> *mut ValueProfRecord {
+pub unsafe fn getValueProfRecordNext(This: *mut ValueProfRecord) -> *mut ValueProfRecord {
     let NumValueData = getValueProfRecordNumValueData(This);
     (This as *mut ::core::ffi::c_char)
         .offset(getValueProfRecordSize((*This).NumValueSites, NumValueData) as isize)
@@ -182,8 +171,7 @@ pub unsafe extern "C" fn getFirstValueProfRecord(This: *mut ValueProfData) -> *m
         as *mut ValueProfRecord
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn getValueProfDataSize(Closure: *mut ValueProfRecordClosure) -> uint32_t {
+pub unsafe fn getValueProfDataSize(Closure: *mut ValueProfRecordClosure) -> uint32_t {
     let mut Kind: uint32_t;
     let mut TotalSize: uint32_t = ::core::mem::size_of::<ValueProfData>() as uint32_t;
     let Record = (*Closure).Record;
@@ -205,70 +193,6 @@ pub unsafe extern "C" fn getValueProfDataSize(Closure: *mut ValueProfRecordClosu
     TotalSize
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn serializeValueProfRecordFrom(
-    This: *mut ValueProfRecord,
-    Closure: *mut ValueProfRecordClosure,
-    ValueKind: uint32_t,
-    NumValueSites: uint32_t,
-) {
-    let mut S: uint32_t;
-    let Record = (*Closure).Record;
-    (*This).Kind = ValueKind;
-    (*This).NumValueSites = NumValueSites;
-    let mut DstVD = getValueProfRecordValueData(This);
-    S = 0 as uint32_t;
-    while S < NumValueSites {
-        let ND = (*Closure)
-            .GetNumValueDataForSite
-            .expect("non-null function pointer")(Record, ValueKind, S);
-        *(&raw mut (*This).SiteCountArray as *mut uint8_t).offset(S as isize) = ND as uint8_t;
-        (*Closure)
-            .GetValueForSite
-            .expect("non-null function pointer")(Record, DstVD, ValueKind, S);
-        DstVD = DstVD.offset(ND as isize);
-        S = S.wrapping_add(1);
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn serializeValueProfDataFrom(
-    Closure: *mut ValueProfRecordClosure,
-    DstData: *mut ValueProfData,
-) -> *mut ValueProfData {
-    let mut Kind: uint32_t;
-    let TotalSize: uint32_t = if !DstData.is_null() {
-        (*DstData).TotalSize
-    } else {
-        getValueProfDataSize(Closure)
-    };
-    let VPD = if !DstData.is_null() {
-        DstData
-    } else {
-        (*Closure)
-            .AllocValueProfData
-            .expect("non-null function pointer")(TotalSize as size_t)
-    };
-    (*VPD).TotalSize = TotalSize;
-    (*VPD).NumValueKinds = (*Closure)
-        .GetNumValueKinds
-        .expect("non-null function pointer")((*Closure).Record);
-    let mut VR = getFirstValueProfRecord(VPD);
-    Kind = IPVK_First as ::core::ffi::c_int as uint32_t;
-    while Kind <= IPVK_Last as ::core::ffi::c_int as uint32_t {
-        let NumValueSites =
-            (*Closure)
-                .GetNumValueSites
-                .expect("non-null function pointer")((*Closure).Record, Kind);
-        if !(NumValueSites == 0) {
-            serializeValueProfRecordFrom(VR, Closure, Kind, NumValueSites);
-            VR = getValueProfRecordNext(VR);
-        }
-        Kind = Kind.wrapping_add(1);
-    }
-    VPD
-}
-
 pub const INSTR_PROF_RAW_VERSION: ::core::ffi::c_int = 11;
 
 pub const VARIANT_MASKS_ALL: u64 = 0xffffffff00000000;
@@ -284,18 +208,15 @@ pub struct InstrProfValueData {
     pub Count: uint64_t,
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn InstProfClzll(X: ::core::ffi::c_ulonglong) -> ::core::ffi::c_int {
+pub unsafe fn InstProfClzll(X: ::core::ffi::c_ulonglong) -> ::core::ffi::c_int {
     X.leading_zeros() as i32
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn InstProfPopcountll(X: ::core::ffi::c_ulonglong) -> ::core::ffi::c_int {
+pub unsafe fn InstProfPopcountll(X: ::core::ffi::c_ulonglong) -> ::core::ffi::c_int {
     X.count_ones() as i32
 }
 
-#[no_mangle]
-pub unsafe extern "C" fn InstrProfGetRangeRepValue(Value: uint64_t) -> uint64_t {
+pub unsafe fn InstrProfGetRangeRepValue(Value: uint64_t) -> uint64_t {
     if Value <= 8 as uint64_t {
         Value
     } else if Value >= 513 as uint64_t {
@@ -308,16 +229,5 @@ pub unsafe extern "C" fn InstrProfGetRangeRepValue(Value: uint64_t) -> uint64_t 
                 - InstProfClzll(Value as ::core::ffi::c_ulonglong)
                 - 1 as ::core::ffi::c_int))
             .wrapping_add(1 as uint64_t)
-    }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn InstrProfIsSingleValRange(Value: uint64_t) -> ::core::ffi::c_uint {
-    if Value <= 8 as uint64_t
-        || InstProfPopcountll(Value as ::core::ffi::c_ulonglong) == 1 as ::core::ffi::c_int
-    {
-        1 as ::core::ffi::c_uint
-    } else {
-        0 as ::core::ffi::c_uint
     }
 }
