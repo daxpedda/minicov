@@ -6,7 +6,12 @@ mod InstrProfilingBuffer;
 mod InstrProfilingInternal;
 mod InstrProfilingMerge;
 mod InstrProfilingMergeFile;
-mod InstrProfilingPlatformLinux;
+#[cfg(not(target_os = "windows"))]
+#[path = "InstrProfilingPlatformLinux.rs"]
+mod InstrProfilingPlatform;
+#[cfg(target_os = "windows")]
+#[path = "InstrProfilingPlatformWindows.rs"]
+mod InstrProfilingPlatform;
 mod InstrProfilingValue;
 mod InstrProfilingVersionVar;
 mod InstrProfilingWriter;
@@ -21,7 +26,7 @@ pub use InstrProfilingMerge::{
     __llvm_profile_check_compatibility, __llvm_profile_merge_from_buffer,
     lprofGetLoadModuleSignature,
 };
-pub use InstrProfilingPlatformLinux::{__llvm_profile_begin_counters, __llvm_profile_end_counters};
+pub use InstrProfilingPlatform::{__llvm_profile_begin_counters, __llvm_profile_end_counters};
 pub use InstrProfilingValue::lprofGetVPDataReader;
 pub use InstrProfilingWriter::lprofWriteData;
 

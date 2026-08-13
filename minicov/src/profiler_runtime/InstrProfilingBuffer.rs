@@ -6,7 +6,7 @@ use super::InstrProfData::{
 };
 use super::InstrProfiling::{__llvm_profile_get_num_padding_bytes, __llvm_profile_get_version};
 use super::InstrProfilingInternal::ProfDataWriter;
-use super::InstrProfilingPlatformLinux::{
+use super::InstrProfilingPlatform::{
     __llvm_profile_begin_bitmap, __llvm_profile_begin_counters, __llvm_profile_begin_data,
     __llvm_profile_begin_names, __llvm_profile_begin_vtables, __llvm_profile_begin_vtabnames,
     __llvm_profile_end_bitmap, __llvm_profile_end_counters, __llvm_profile_end_data,
@@ -140,6 +140,9 @@ unsafe fn calculateBytesNeededToPageAlign(Offset: u64) -> u64 {
 }
 
 unsafe fn needsCounterPadding() -> c_int {
+    #[cfg(target_vendor = "apple")]
+    return __llvm_profile_is_continuous_mode_enabled();
+    #[cfg(not(target_vendor = "apple"))]
     0
 }
 

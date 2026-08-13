@@ -16,7 +16,7 @@ use super::InstrProfilingBuffer::{
     __llvm_profile_is_continuous_mode_enabled, initBufferWriter,
 };
 use super::InstrProfilingInternal::{ProfDataIOVec, ProfDataWriter, VPDataReaderType};
-use super::InstrProfilingPlatformLinux::{
+use super::InstrProfilingPlatform::{
     __llvm_profile_begin_bitmap, __llvm_profile_begin_counters, __llvm_profile_begin_data,
     __llvm_profile_begin_names, __llvm_profile_begin_vtables, __llvm_profile_begin_vtabnames,
     __llvm_profile_end_bitmap, __llvm_profile_end_counters, __llvm_profile_end_data,
@@ -484,6 +484,13 @@ pub unsafe fn lprofWriteDataImpl(
     Header.VNamesSize = VNamesSize;
     Header.ValueKindLast = IPVK_Last as c_int as u64;
     Header.Version = Version;
+    #[cfg(all(target_os = "windows", target_pointer_width = "64"))]
+    {
+        Header.CountersDelta = Header.CountersDelta as u32 as u64;
+        Header.BitmapDelta = Header.BitmapDelta as u32 as u64;
+        Header.UniformCountersDelta = Header.UniformCountersDelta as u32 as u64;
+    }
+
     if NumUniformCounters > 0 {
         Header.UniformCountersDelta = DataSectionSize
             .wrapping_add(PaddingBytesBeforeCounters)
@@ -624,4 +631,42 @@ pub unsafe fn lprofWriteDataImpl(
         return 0;
     }
     writeValueProfData(Writer, VPDataReader, DataBegin, DataEnd)
+}
+
+#[cfg(target_os = "windows")]
+pub unsafe fn lprofWriteOneBinaryId(
+    Writer: *mut ProfDataWriter,
+    mut BinaryIdLen: u64,
+    BinaryIdData: *const u8,
+    BinaryIdPadding: u64,
+) -> c_int {
+    let mut BinaryIdIOVec: [ProfDataIOVec; 3] = [
+        ProfDataIOVec {
+            Data: &raw mut BinaryIdLen as *const c_void,
+            ElmSize: mem::size_of::<u64>(),
+            NumElm: 1,
+            UseZeroPadding: 0,
+        },
+        ProfDataIOVec {
+            Data: BinaryIdData as *const c_void,
+            ElmSize: mem::size_of::<u8>(),
+            NumElm: BinaryIdLen as usize,
+            UseZeroPadding: 0,
+        },
+        ProfDataIOVec {
+            Data: ptr::null(),
+            ElmSize: mem::size_of::<u8>(),
+            NumElm: BinaryIdPadding as usize,
+            UseZeroPadding: 1,
+        },
+    ];
+    if (*Writer).Write.expect("non-null function pointer")(
+        Writer,
+        BinaryIdIOVec.as_mut_ptr(),
+        (mem::size_of::<[ProfDataIOVec; 3]>()).wrapping_div(mem::size_of::<ProfDataIOVec>()) as u32,
+    ) != 0
+    {
+        return -1;
+    }
+    0
 }

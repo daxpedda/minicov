@@ -14,7 +14,7 @@ use super::InstrProfilingBuffer::{
     __llvm_profile_get_num_data,
 };
 use super::InstrProfilingMergeFile::lprofMergeValueProfData;
-use super::InstrProfilingPlatformLinux::{
+use super::InstrProfilingPlatform::{
     __llvm_profile_begin_bitmap, __llvm_profile_begin_counters, __llvm_profile_begin_data,
     __llvm_profile_begin_names, __llvm_profile_begin_vnodes, __llvm_profile_end_bitmap,
     __llvm_profile_end_counters, __llvm_profile_end_data, __llvm_profile_end_names,
@@ -120,7 +120,10 @@ pub unsafe fn __llvm_profile_check_compatibility(
 }
 
 unsafe fn signextIfWin64(V: *mut c_void) -> usize {
-    V as usize
+    #[cfg(all(target_os = "windows", target_pointer_width = "64"))]
+    return (V as usize as i32) as isize as usize;
+    #[cfg(not(all(target_os = "windows", target_pointer_width = "64")))]
+    return V as usize;
 }
 
 unsafe fn getDistanceFromCounterToValueProf(Header: *const __llvm_profile_header) -> u64 {

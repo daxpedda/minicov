@@ -7,7 +7,7 @@ use super::InstrProfData::{
     VARIANT_MASK_TEMPORAL_PROF,
 };
 use super::InstrProfilingInternal::lprofSetProfileDumped;
-use super::InstrProfilingPlatformLinux::{
+use super::InstrProfilingPlatform::{
     __llvm_profile_begin_bitmap, __llvm_profile_begin_counters, __llvm_profile_begin_data,
     __llvm_profile_end_bitmap, __llvm_profile_end_counters, __llvm_profile_end_data,
 };

@@ -8,7 +8,7 @@ use super::InstrProfData::{
     InstrProfValueData, ValueProfNode, ValueProfRecordClosure, INSTR_PROF_MAX_NUM_VAL_PER_SITE,
 };
 use super::InstrProfilingInternal::VPDataReaderType;
-use super::InstrProfilingPlatformLinux::{CurrentVNode, EndVNode};
+use super::InstrProfilingPlatform::{CurrentVNode, EndVNode};
 use super::{minicov_alloc_zeroed, minicov_dealloc};
 
 static mut hasStaticCounters: c_int = 1;
@@ -16,8 +16,14 @@ static mut OutOfNodesWarnings: c_int = 0;
 static mut hasNonDefaultValsPerSite: c_int = 0;
 pub const INSTR_PROF_DEFAULT_NUM_VAL_PER_SITE: c_int = 24;
 
+#[cfg(not(target_env = "msvc"))]
 #[used]
-#[link_section = "__llvm_prf_vnds"]
+#[cfg_attr(
+    not(any(target_vendor = "apple", target_os = "windows")),
+    link_section = "__llvm_prf_vnds"
+)]
+#[cfg_attr(target_vendor = "apple", link_section = "__DATA,__llvm_prf_vnds")]
+#[cfg_attr(target_os = "windows", link_section = ".lprfnd$M")]
 pub static mut lprofValueProfNodes: [ValueProfNode; 1024] = [ValueProfNode {
     Value: 0,
     Count: 0,
