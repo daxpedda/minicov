@@ -1,53 +1,50 @@
+use core::ffi::{c_int, c_uint, c_void};
+
 use super::InstrProfData::{
     __llvm_profile_data, InstrProfValueData, ValueProfData, ValueProfNode, ValueProfRecord,
 };
 
-pub type size_t = usize;
-pub type uint32_t = u32;
-pub type uint8_t = u8;
-
-static mut ProfileDumped: ::core::ffi::c_uint = 0 as ::core::ffi::c_uint;
+static mut ProfileDumped: c_uint = 0;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct ProfDataIOVec {
-    pub Data: *const ::core::ffi::c_void,
-    pub ElmSize: size_t,
-    pub NumElm: size_t,
-    pub UseZeroPadding: ::core::ffi::c_int,
+    pub Data: *const c_void,
+    pub ElmSize: usize,
+    pub NumElm: usize,
+    pub UseZeroPadding: c_int,
 }
 
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct ProfDataWriter {
     pub Write: WriterCallback,
-    pub WriterCtx: *mut ::core::ffi::c_void,
+    pub WriterCtx: *mut c_void,
 }
 
 pub type WriterCallback =
-    Option<unsafe extern "C" fn(*mut ProfDataWriter, *mut ProfDataIOVec, uint32_t) -> uint32_t>;
+    Option<unsafe extern "C" fn(*mut ProfDataWriter, *mut ProfDataIOVec, u32) -> u32>;
 
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct VPDataReaderType {
-    pub InitRTRecord:
-        Option<unsafe extern "C" fn(*const __llvm_profile_data, *mut *mut uint8_t) -> uint32_t>,
-    pub GetValueProfRecordHeaderSize: Option<unsafe extern "C" fn(uint32_t) -> uint32_t>,
+    pub InitRTRecord: Option<unsafe extern "C" fn(*const __llvm_profile_data, *mut *mut u8) -> u32>,
+    pub GetValueProfRecordHeaderSize: Option<unsafe extern "C" fn(u32) -> u32>,
     pub GetFirstValueProfRecord:
         Option<unsafe extern "C" fn(*mut ValueProfData) -> *mut ValueProfRecord>,
-    pub GetNumValueDataForSite: Option<unsafe extern "C" fn(uint32_t, uint32_t) -> uint32_t>,
-    pub GetValueProfDataSize: Option<unsafe extern "C" fn() -> uint32_t>,
+    pub GetNumValueDataForSite: Option<unsafe extern "C" fn(u32, u32) -> u32>,
+    pub GetValueProfDataSize: Option<unsafe extern "C" fn() -> u32>,
     pub GetValueData: Option<
         unsafe extern "C" fn(
-            uint32_t,
-            uint32_t,
+            u32,
+            u32,
             *mut InstrProfValueData,
             *mut ValueProfNode,
-            uint32_t,
+            u32,
         ) -> *mut ValueProfNode,
     >,
 }
 
-pub unsafe fn lprofSetProfileDumped(Value: ::core::ffi::c_uint) {
+pub unsafe fn lprofSetProfileDumped(Value: c_uint) {
     ProfileDumped = Value;
 }

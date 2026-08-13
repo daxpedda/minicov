@@ -1,3 +1,5 @@
+use core::ffi::{c_char, c_int, c_void};
+use core::mem;
 use core::ptr;
 
 use super::InstrProfData::{
@@ -11,104 +13,90 @@ use super::InstrProfilingPlatformLinux::{
 };
 use super::InstrProfilingVersionVar::__llvm_profile_raw_version;
 
-pub type uint64_t = u64;
-pub type uint32_t = u32;
-pub type uint8_t = u8;
+static mut __llvm_profile_global_timestamp: u32 = 1;
 
-static mut __llvm_profile_global_timestamp: uint32_t = 1 as uint32_t;
-
-pub unsafe fn __llvm_profile_set_timestamp(Probe: *mut uint64_t) {
-    if *Probe == 0 as uint64_t || *Probe == -(1 as ::core::ffi::c_int) as uint64_t {
+pub unsafe fn __llvm_profile_set_timestamp(Probe: *mut u64) {
+    if *Probe == 0 || *Probe == -(1 as c_int) as u64 {
         let fresh0 = __llvm_profile_global_timestamp;
         __llvm_profile_global_timestamp = __llvm_profile_global_timestamp.wrapping_add(1);
-        *Probe = fresh0 as uint64_t;
+        *Probe = fresh0 as u64;
     }
 }
 
-pub unsafe fn __llvm_profile_get_magic() -> uint64_t {
-    if ::core::mem::size_of::<*mut ::core::ffi::c_void>() as usize
-        == ::core::mem::size_of::<uint64_t>() as usize
-    {
-        (255 as ::core::ffi::c_int as uint64_t) << 56 as ::core::ffi::c_int
-            | ('l' as i32 as uint64_t) << 48 as ::core::ffi::c_int
-            | ('p' as i32 as uint64_t) << 40 as ::core::ffi::c_int
-            | ('r' as i32 as uint64_t) << 32 as ::core::ffi::c_int
-            | ('o' as i32 as uint64_t) << 24 as ::core::ffi::c_int
-            | ('f' as i32 as uint64_t) << 16 as ::core::ffi::c_int
-            | ('r' as i32 as uint64_t) << 8 as ::core::ffi::c_int
-            | 129 as ::core::ffi::c_int as uint64_t
+pub unsafe fn __llvm_profile_get_magic() -> u64 {
+    if mem::size_of::<*mut c_void>() == mem::size_of::<u64>() {
+        255_u64 << 56
+            | ('l' as u64) << 48
+            | ('p' as u64) << 40
+            | ('r' as u64) << 32
+            | ('o' as u64) << 24
+            | ('f' as u64) << 16
+            | ('r' as u64) << 8
+            | 129_u64
     } else {
-        (255 as ::core::ffi::c_int as uint64_t) << 56 as ::core::ffi::c_int
-            | ('l' as i32 as uint64_t) << 48 as ::core::ffi::c_int
-            | ('p' as i32 as uint64_t) << 40 as ::core::ffi::c_int
-            | ('r' as i32 as uint64_t) << 32 as ::core::ffi::c_int
-            | ('o' as i32 as uint64_t) << 24 as ::core::ffi::c_int
-            | ('f' as i32 as uint64_t) << 16 as ::core::ffi::c_int
-            | ('R' as i32 as uint64_t) << 8 as ::core::ffi::c_int
-            | 129 as ::core::ffi::c_int as uint64_t
+        255_u64 << 56
+            | ('l' as u64) << 48
+            | ('p' as u64) << 40
+            | ('r' as u64) << 32
+            | ('o' as u64) << 24
+            | ('f' as u64) << 16
+            | ('R' as u64) << 8
+            | 129_u64
     }
 }
 
 pub unsafe fn __llvm_profile_set_dumped() {
-    lprofSetProfileDumped(1 as ::core::ffi::c_uint);
+    lprofSetProfileDumped(1);
 }
 
-pub unsafe fn __llvm_profile_get_num_padding_bytes(SizeInBytes: uint64_t) -> uint8_t {
-    (7 as uint64_t
-        & (::core::mem::size_of::<uint64_t>() as uint64_t)
-            .wrapping_sub(SizeInBytes.wrapping_rem(::core::mem::size_of::<uint64_t>() as uint64_t)))
-        as uint8_t
+pub unsafe fn __llvm_profile_get_num_padding_bytes(SizeInBytes: u64) -> u8 {
+    (7_u64
+        & (mem::size_of::<u64>() as u64)
+            .wrapping_sub(SizeInBytes.wrapping_rem(mem::size_of::<u64>() as u64))) as u8
 }
 
-pub unsafe fn __llvm_profile_get_version() -> uint64_t {
+pub unsafe fn __llvm_profile_get_version() -> u64 {
     __llvm_profile_raw_version
 }
 
 pub unsafe fn __llvm_profile_reset_counters() {
-    if __llvm_profile_get_version() & VARIANT_MASK_TEMPORAL_PROF as uint64_t != 0 {
-        __llvm_profile_global_timestamp = 1 as uint32_t;
+    #[expect(clippy::unnecessary_cast)]
+    if __llvm_profile_get_version() & VARIANT_MASK_TEMPORAL_PROF as u64 != 0 {
+        __llvm_profile_global_timestamp = 1;
     }
     let mut I = __llvm_profile_begin_counters();
     let mut E = __llvm_profile_end_counters();
-    let ResetValue = (if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as uint64_t != 0
-    {
-        0xff as ::core::ffi::c_int
+    #[expect(clippy::unnecessary_cast)]
+    let ResetValue = (if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as u64 != 0 {
+        0xff
     } else {
-        0 as ::core::ffi::c_int
-    }) as ::core::ffi::c_char;
-    ptr::write_bytes(
-        I,
-        ResetValue as u8,
-        E.offset_from(I) as ::core::ffi::c_long as ::core::ffi::c_ulong as usize,
-    );
+        0
+    }) as c_char;
+    ptr::write_bytes(I, ResetValue as u8, E.offset_from(I) as usize);
     I = __llvm_profile_begin_bitmap();
     E = __llvm_profile_end_bitmap();
-    ptr::write_bytes(
-        I as *mut ::core::ffi::c_void,
-        0,
-        E.offset_from(I) as ::core::ffi::c_long as ::core::ffi::c_ulong as usize,
-    );
+    ptr::write_bytes(I as *mut c_void, 0, E.offset_from(I) as usize);
     let DataBegin = __llvm_profile_begin_data();
     let DataEnd = __llvm_profile_end_data();
     let mut DI: *const __llvm_profile_data;
     DI = DataBegin;
     while DI < DataEnd {
-        let mut CurrentVSiteCount: uint64_t = 0 as uint64_t;
-        let mut VKI: uint32_t;
-        let mut i: uint32_t;
+        let mut CurrentVSiteCount: u64 = 0;
+        let mut VKI: u32;
+        let mut i: u32;
         if !(*DI).0.Values.is_null() {
             let ValueCounters = (*DI).0.Values as *mut *mut ValueProfNode;
-            VKI = IPVK_First as ::core::ffi::c_int as uint32_t;
-            while VKI <= IPVK_Last as ::core::ffi::c_int as uint32_t {
+            VKI = IPVK_First as c_int as u32;
+            while VKI <= IPVK_Last as c_int as u32 {
                 CurrentVSiteCount =
-                    CurrentVSiteCount.wrapping_add((*DI).0.NumValueSites[VKI as usize] as uint64_t);
+                    CurrentVSiteCount.wrapping_add((*DI).0.NumValueSites[VKI as usize] as u64);
                 VKI = VKI.wrapping_add(1);
             }
-            i = 0 as uint32_t;
-            while (i as uint64_t) < CurrentVSiteCount {
+            i = 0;
+            while (i as u64) < CurrentVSiteCount {
                 let mut CurrVNode = *ValueCounters.offset(i as isize);
                 while !CurrVNode.is_null() {
-                    (*CurrVNode).Count = 0 as uint64_t;
+                    (*CurrVNode).Count = 0;
                     CurrVNode = (*CurrVNode).Next;
                 }
                 i = i.wrapping_add(1);
@@ -116,5 +104,5 @@ pub unsafe fn __llvm_profile_reset_counters() {
         }
         DI = DI.offset(1);
     }
-    lprofSetProfileDumped(0 as ::core::ffi::c_uint);
+    lprofSetProfileDumped(0);
 }

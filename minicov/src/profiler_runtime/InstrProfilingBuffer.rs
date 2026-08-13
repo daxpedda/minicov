@@ -1,10 +1,11 @@
+use core::ffi::{c_char, c_int, c_uint, c_void};
+use core::{mem, ptr};
+
 use super::InstrProfData::{
     __llvm_profile_data, __llvm_profile_header, VTableProfData, VARIANT_MASK_BYTE_COVERAGE,
 };
 use super::InstrProfiling::{__llvm_profile_get_num_padding_bytes, __llvm_profile_get_version};
-use super::InstrProfilingInternal::{
-    ProfDataIOVec, ProfDataWriter, VPDataReaderType, WriterCallback,
-};
+use super::InstrProfilingInternal::ProfDataWriter;
 use super::InstrProfilingPlatformLinux::{
     __llvm_profile_begin_bitmap, __llvm_profile_begin_counters, __llvm_profile_begin_data,
     __llvm_profile_begin_names, __llvm_profile_begin_vtables, __llvm_profile_begin_vtabnames,
@@ -14,38 +15,32 @@ use super::InstrProfilingPlatformLinux::{
 };
 use super::InstrProfilingWriter::{lprofBufferWriter, lprofWriteData, lprofWriteDataImpl};
 
-pub type size_t = usize;
-pub type uint64_t = u64;
-pub type uint32_t = u32;
-pub type uint8_t = u8;
-pub type intptr_t = isize;
+static mut ContinuouslySyncProfile: c_int = 0;
+static mut PageSize: c_uint = 0;
 
-static mut ContinuouslySyncProfile: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
-static mut PageSize: ::core::ffi::c_uint = 0 as ::core::ffi::c_uint;
-
-pub unsafe fn __llvm_profile_is_continuous_mode_enabled() -> ::core::ffi::c_int {
-    (ContinuouslySyncProfile != 0 && PageSize != 0) as ::core::ffi::c_int
+pub unsafe fn __llvm_profile_is_continuous_mode_enabled() -> c_int {
+    (ContinuouslySyncProfile != 0 && PageSize != 0) as c_int
 }
 
 pub unsafe fn __llvm_profile_enable_continuous_mode() {
-    ContinuouslySyncProfile = 1 as ::core::ffi::c_int;
+    ContinuouslySyncProfile = 1;
 }
 
 pub unsafe fn __llvm_profile_disable_continuous_mode() {
-    ContinuouslySyncProfile = 0 as ::core::ffi::c_int;
+    ContinuouslySyncProfile = 0;
 }
 
-pub unsafe fn __llvm_profile_set_page_size(PS: ::core::ffi::c_uint) {
+pub unsafe fn __llvm_profile_set_page_size(PS: c_uint) {
     PageSize = PS;
 }
 
-pub unsafe fn __llvm_profile_get_size_for_buffer() -> uint64_t {
+pub unsafe fn __llvm_profile_get_size_for_buffer() -> u64 {
     let DataBegin = __llvm_profile_begin_data();
     let DataEnd = __llvm_profile_end_data();
-    let CountersBegin: *const ::core::ffi::c_char = __llvm_profile_begin_counters();
-    let CountersEnd: *const ::core::ffi::c_char = __llvm_profile_end_counters();
-    let BitmapBegin: *const ::core::ffi::c_char = __llvm_profile_begin_bitmap();
-    let BitmapEnd: *const ::core::ffi::c_char = __llvm_profile_end_bitmap();
+    let CountersBegin = __llvm_profile_begin_counters();
+    let CountersEnd = __llvm_profile_end_counters();
+    let BitmapBegin = __llvm_profile_begin_bitmap();
+    let BitmapEnd = __llvm_profile_end_bitmap();
     let NamesBegin = __llvm_profile_begin_names();
     let NamesEnd = __llvm_profile_end_names();
     let VTableBegin = __llvm_profile_begin_vtables();
@@ -71,190 +66,176 @@ pub unsafe fn __llvm_profile_get_size_for_buffer() -> uint64_t {
 pub unsafe fn __llvm_profile_get_num_data(
     Begin: *const __llvm_profile_data,
     End: *const __llvm_profile_data,
-) -> uint64_t {
-    let BeginI: intptr_t = Begin as intptr_t;
-    let EndI: intptr_t = End as intptr_t;
+) -> u64 {
+    let BeginI = Begin as isize;
+    let EndI = End as isize;
     (EndI as usize)
-        .wrapping_add(::core::mem::size_of::<__llvm_profile_data>() as usize)
+        .wrapping_add(mem::size_of::<__llvm_profile_data>())
         .wrapping_sub(1)
         .wrapping_sub(BeginI as usize)
-        .wrapping_div(::core::mem::size_of::<__llvm_profile_data>() as usize) as uint64_t
+        .wrapping_div(mem::size_of::<__llvm_profile_data>()) as u64
 }
 
 pub unsafe fn __llvm_profile_get_data_size(
     Begin: *const __llvm_profile_data,
     End: *const __llvm_profile_data,
-) -> uint64_t {
+) -> u64 {
     __llvm_profile_get_num_data(Begin, End)
-        .wrapping_mul(::core::mem::size_of::<__llvm_profile_data>() as uint64_t)
+        .wrapping_mul(mem::size_of::<__llvm_profile_data>() as u64)
 }
 
 pub unsafe fn __llvm_profile_get_num_vtable(
     Begin: *const VTableProfData,
     End: *const VTableProfData,
-) -> uint64_t {
-    let EndI: intptr_t = End as intptr_t;
-    let BeginI: intptr_t = Begin as intptr_t;
-    ((EndI - BeginI) as usize).wrapping_div(::core::mem::size_of::<VTableProfData>() as usize)
-        as uint64_t
+) -> u64 {
+    let EndI: isize = End as isize;
+    let BeginI: isize = Begin as isize;
+    ((EndI - BeginI) as usize).wrapping_div(mem::size_of::<VTableProfData>()) as u64
 }
 
 pub unsafe fn __llvm_profile_get_vtable_section_size(
     Begin: *const VTableProfData,
     End: *const VTableProfData,
-) -> uint64_t {
-    (End as intptr_t - Begin as intptr_t) as uint64_t
+) -> u64 {
+    (End as isize - Begin as isize) as u64
 }
 
-pub unsafe fn __llvm_profile_counter_entry_size() -> size_t {
-    if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as uint64_t != 0 {
-        return ::core::mem::size_of::<uint8_t>() as size_t;
+pub unsafe fn __llvm_profile_counter_entry_size() -> usize {
+    #[expect(clippy::unnecessary_cast)]
+    if __llvm_profile_get_version() & VARIANT_MASK_BYTE_COVERAGE as u64 != 0 {
+        return mem::size_of::<u8>();
     }
-    ::core::mem::size_of::<uint64_t>() as size_t
+    mem::size_of::<u64>()
 }
 
-pub unsafe fn __llvm_profile_get_num_counters(
-    Begin: *const ::core::ffi::c_char,
-    End: *const ::core::ffi::c_char,
-) -> uint64_t {
-    let BeginI: intptr_t = Begin as intptr_t;
-    let EndI: intptr_t = End as intptr_t;
-    (EndI as size_t)
+pub unsafe fn __llvm_profile_get_num_counters(Begin: *const c_char, End: *const c_char) -> u64 {
+    let BeginI: isize = Begin as isize;
+    let EndI: isize = End as isize;
+    (EndI as usize)
         .wrapping_add(__llvm_profile_counter_entry_size())
-        .wrapping_sub(1 as size_t)
-        .wrapping_sub(BeginI as size_t)
-        .wrapping_div(__llvm_profile_counter_entry_size()) as uint64_t
+        .wrapping_sub(1)
+        .wrapping_sub(BeginI as usize)
+        .wrapping_div(__llvm_profile_counter_entry_size()) as u64
 }
 
-pub unsafe fn __llvm_profile_get_counters_size(
-    Begin: *const ::core::ffi::c_char,
-    End: *const ::core::ffi::c_char,
-) -> uint64_t {
+pub unsafe fn __llvm_profile_get_counters_size(Begin: *const c_char, End: *const c_char) -> u64 {
     __llvm_profile_get_num_counters(Begin, End)
-        .wrapping_mul(__llvm_profile_counter_entry_size() as uint64_t)
+        .wrapping_mul(__llvm_profile_counter_entry_size() as u64)
 }
 
-pub unsafe fn __llvm_profile_get_num_bitmap_bytes(
-    Begin: *const ::core::ffi::c_char,
-    End: *const ::core::ffi::c_char,
-) -> uint64_t {
-    End.offset_from(Begin) as ::core::ffi::c_long as uint64_t
+pub unsafe fn __llvm_profile_get_num_bitmap_bytes(Begin: *const c_char, End: *const c_char) -> u64 {
+    End.offset_from(Begin) as u64
 }
 
-pub unsafe fn __llvm_profile_get_name_size(
-    Begin: *const ::core::ffi::c_char,
-    End: *const ::core::ffi::c_char,
-) -> uint64_t {
-    End.offset_from(Begin) as ::core::ffi::c_long as uint64_t
+pub unsafe fn __llvm_profile_get_name_size(Begin: *const c_char, End: *const c_char) -> u64 {
+    End.offset_from(Begin) as u64
 }
 
-unsafe fn calculateBytesNeededToPageAlign(Offset: uint64_t) -> uint64_t {
-    let OffsetModPage: uint64_t = Offset.wrapping_rem(PageSize as uint64_t);
-    if OffsetModPage > 0 as uint64_t {
-        return (PageSize as uint64_t).wrapping_sub(OffsetModPage);
+unsafe fn calculateBytesNeededToPageAlign(Offset: u64) -> u64 {
+    let OffsetModPage = Offset.wrapping_rem(PageSize as u64);
+    if OffsetModPage > 0 {
+        return (PageSize as u64).wrapping_sub(OffsetModPage);
     }
-    0 as uint64_t
+    0
 }
 
-unsafe fn needsCounterPadding() -> ::core::ffi::c_int {
-    0 as ::core::ffi::c_int
+unsafe fn needsCounterPadding() -> c_int {
+    0
 }
 
 #[expect(clippy::too_many_arguments)]
 pub unsafe fn __llvm_profile_get_padding_sizes_for_counters(
-    DataSize: uint64_t,
-    CountersSize: uint64_t,
-    NumBitmapBytes: uint64_t,
-    NumUniformCounters: uint64_t,
-    NamesSize: uint64_t,
-    VTableSize: uint64_t,
-    VNameSize: uint64_t,
-    PaddingBytesBeforeCounters: *mut uint64_t,
-    PaddingBytesAfterCounters: *mut uint64_t,
-    PaddingBytesAfterBitmapBytes: *mut uint64_t,
-    PaddingBytesAfterUniformCounters: *mut uint64_t,
-    PaddingBytesAfterNames: *mut uint64_t,
-    PaddingBytesAfterVTable: *mut uint64_t,
-    PaddingBytesAfterVName: *mut uint64_t,
-) -> ::core::ffi::c_int {
+    DataSize: u64,
+    CountersSize: u64,
+    NumBitmapBytes: u64,
+    NumUniformCounters: u64,
+    NamesSize: u64,
+    VTableSize: u64,
+    VNameSize: u64,
+    PaddingBytesBeforeCounters: *mut u64,
+    PaddingBytesAfterCounters: *mut u64,
+    PaddingBytesAfterBitmapBytes: *mut u64,
+    PaddingBytesAfterUniformCounters: *mut u64,
+    PaddingBytesAfterNames: *mut u64,
+    PaddingBytesAfterVTable: *mut u64,
+    PaddingBytesAfterVName: *mut u64,
+) -> c_int {
     if needsCounterPadding() == 0 {
-        *PaddingBytesBeforeCounters = 0 as uint64_t;
-        *PaddingBytesAfterCounters = __llvm_profile_get_num_padding_bytes(CountersSize) as uint64_t;
-        *PaddingBytesAfterBitmapBytes =
-            __llvm_profile_get_num_padding_bytes(NumBitmapBytes) as uint64_t;
+        *PaddingBytesBeforeCounters = 0;
+        *PaddingBytesAfterCounters = __llvm_profile_get_num_padding_bytes(CountersSize) as u64;
+        *PaddingBytesAfterBitmapBytes = __llvm_profile_get_num_padding_bytes(NumBitmapBytes) as u64;
         if !PaddingBytesAfterUniformCounters.is_null() {
             *PaddingBytesAfterUniformCounters = __llvm_profile_get_num_padding_bytes(
-                NumUniformCounters.wrapping_mul(::core::mem::size_of::<uint64_t>() as uint64_t),
-            ) as uint64_t;
+                NumUniformCounters.wrapping_mul(mem::size_of::<u64>() as u64),
+            ) as u64;
         }
-        *PaddingBytesAfterNames = __llvm_profile_get_num_padding_bytes(NamesSize) as uint64_t;
+        *PaddingBytesAfterNames = __llvm_profile_get_num_padding_bytes(NamesSize) as u64;
         if !PaddingBytesAfterVTable.is_null() {
-            *PaddingBytesAfterVTable = __llvm_profile_get_num_padding_bytes(VTableSize) as uint64_t;
+            *PaddingBytesAfterVTable = __llvm_profile_get_num_padding_bytes(VTableSize) as u64;
         }
         if !PaddingBytesAfterVName.is_null() {
-            *PaddingBytesAfterVName = __llvm_profile_get_num_padding_bytes(VNameSize) as uint64_t;
+            *PaddingBytesAfterVName = __llvm_profile_get_num_padding_bytes(VNameSize) as u64;
         }
-        return 0 as ::core::ffi::c_int;
+        return 0;
     }
-    if VTableSize != 0 as uint64_t || VNameSize != 0 as uint64_t {
-        return -(1 as ::core::ffi::c_int);
+    if VTableSize != 0 || VNameSize != 0 {
+        return -1;
     }
     *PaddingBytesBeforeCounters = calculateBytesNeededToPageAlign(
-        (::core::mem::size_of::<__llvm_profile_header>() as uint64_t).wrapping_add(DataSize),
+        (mem::size_of::<__llvm_profile_header>() as u64).wrapping_add(DataSize),
     );
     *PaddingBytesAfterCounters = calculateBytesNeededToPageAlign(CountersSize);
     *PaddingBytesAfterBitmapBytes = calculateBytesNeededToPageAlign(NumBitmapBytes);
     if !PaddingBytesAfterUniformCounters.is_null() {
-        *PaddingBytesAfterUniformCounters = 0 as uint64_t;
+        *PaddingBytesAfterUniformCounters = 0;
     }
     *PaddingBytesAfterNames = calculateBytesNeededToPageAlign(NamesSize);
     if !PaddingBytesAfterVTable.is_null() {
-        *PaddingBytesAfterVTable = 0 as uint64_t;
+        *PaddingBytesAfterVTable = 0;
     }
     if !PaddingBytesAfterVName.is_null() {
-        *PaddingBytesAfterVName = 0 as uint64_t;
+        *PaddingBytesAfterVName = 0;
     }
-    0 as ::core::ffi::c_int
+    0
 }
 
 #[expect(clippy::too_many_arguments)]
 pub unsafe fn __llvm_profile_get_size_for_buffer_internal(
     DataBegin: *const __llvm_profile_data,
     DataEnd: *const __llvm_profile_data,
-    CountersBegin: *const ::core::ffi::c_char,
-    CountersEnd: *const ::core::ffi::c_char,
-    BitmapBegin: *const ::core::ffi::c_char,
-    BitmapEnd: *const ::core::ffi::c_char,
-    NamesBegin: *const ::core::ffi::c_char,
-    NamesEnd: *const ::core::ffi::c_char,
+    CountersBegin: *const c_char,
+    CountersEnd: *const c_char,
+    BitmapBegin: *const c_char,
+    BitmapEnd: *const c_char,
+    NamesBegin: *const c_char,
+    NamesEnd: *const c_char,
     VTableBegin: *const VTableProfData,
     VTableEnd: *const VTableProfData,
-    VNamesBegin: *const ::core::ffi::c_char,
-    VNamesEnd: *const ::core::ffi::c_char,
-) -> uint64_t {
-    let NamesSize: uint64_t = (NamesEnd.offset_from(NamesBegin) as ::core::ffi::c_long as usize)
-        .wrapping_mul(::core::mem::size_of::<::core::ffi::c_char>() as usize)
-        as uint64_t;
+    VNamesBegin: *const c_char,
+    VNamesEnd: *const c_char,
+) -> u64 {
+    let NamesSize: u64 = (NamesEnd.offset_from(NamesBegin) as usize)
+        .wrapping_mul(mem::size_of::<c_char>() as usize) as u64;
     let DataSize = __llvm_profile_get_data_size(DataBegin, DataEnd);
     let CountersSize = __llvm_profile_get_counters_size(CountersBegin, CountersEnd);
-    let NumBitmapBytes = __llvm_profile_get_num_bitmap_bytes(BitmapBegin, BitmapEnd) as uint64_t;
-    let VTableSize = __llvm_profile_get_vtable_section_size(VTableBegin, VTableEnd) as uint64_t;
-    let VNameSize = __llvm_profile_get_name_size(VNamesBegin, VNamesEnd) as uint64_t;
-    let mut PaddingBytesBeforeCounters: uint64_t = 0;
-    let mut PaddingBytesAfterCounters: uint64_t = 0;
-    let mut PaddingBytesAfterNames: uint64_t = 0;
-    let mut PaddingBytesAfterBitmapBytes: uint64_t = 0;
-    let mut PaddingBytesAfterUniformCounters: uint64_t = 0;
-    let mut PaddingBytesAfterVTable: uint64_t = 0;
-    let mut PaddingBytesAfterVNames: uint64_t = 0;
+    let NumBitmapBytes = __llvm_profile_get_num_bitmap_bytes(BitmapBegin, BitmapEnd);
+    let VTableSize = __llvm_profile_get_vtable_section_size(VTableBegin, VTableEnd);
+    let VNameSize = __llvm_profile_get_name_size(VNamesBegin, VNamesEnd);
+    let mut PaddingBytesBeforeCounters: u64 = 0;
+    let mut PaddingBytesAfterCounters: u64 = 0;
+    let mut PaddingBytesAfterNames: u64 = 0;
+    let mut PaddingBytesAfterBitmapBytes: u64 = 0;
+    let mut PaddingBytesAfterUniformCounters: u64 = 0;
+    let mut PaddingBytesAfterVTable: u64 = 0;
+    let mut PaddingBytesAfterVNames: u64 = 0;
     __llvm_profile_get_padding_sizes_for_counters(
         DataSize,
         CountersSize,
         NumBitmapBytes,
-        0 as uint64_t,
+        0,
         NamesSize,
-        0 as uint64_t,
-        0 as uint64_t,
+        0,
+        0,
         &raw mut PaddingBytesBeforeCounters,
         &raw mut PaddingBytesAfterCounters,
         &raw mut PaddingBytesAfterBitmapBytes,
@@ -263,9 +244,9 @@ pub unsafe fn __llvm_profile_get_size_for_buffer_internal(
         &raw mut PaddingBytesAfterVTable,
         &raw mut PaddingBytesAfterVNames,
     );
-    ((::core::mem::size_of::<__llvm_profile_header>() as usize)
-        .wrapping_add(__llvm_write_binary_ids(::core::ptr::null_mut::<ProfDataWriter>()) as usize)
-        as uint64_t)
+    ((mem::size_of::<__llvm_profile_header>())
+        .wrapping_add(__llvm_write_binary_ids(ptr::null_mut::<ProfDataWriter>()) as usize)
+        as u64)
         .wrapping_add(DataSize)
         .wrapping_add(PaddingBytesBeforeCounters)
         .wrapping_add(CountersSize)
@@ -281,45 +262,35 @@ pub unsafe fn __llvm_profile_get_size_for_buffer_internal(
         .wrapping_add(PaddingBytesAfterVNames)
 }
 
-pub unsafe fn initBufferWriter(
-    BufferWriter: *mut ProfDataWriter,
-    Buffer: *mut ::core::ffi::c_char,
-) {
-    (*BufferWriter).Write = Some(
-        lprofBufferWriter
-            as unsafe extern "C" fn(*mut ProfDataWriter, *mut ProfDataIOVec, uint32_t) -> uint32_t,
-    ) as WriterCallback;
-    (*BufferWriter).WriterCtx = Buffer as *mut ::core::ffi::c_void;
+pub unsafe fn initBufferWriter(BufferWriter: *mut ProfDataWriter, Buffer: *mut c_char) {
+    (*BufferWriter).Write = Some(lprofBufferWriter);
+    (*BufferWriter).WriterCtx = Buffer as *mut c_void;
 }
 
-pub unsafe fn __llvm_profile_write_buffer(Buffer: *mut ::core::ffi::c_char) -> ::core::ffi::c_int {
+pub unsafe fn __llvm_profile_write_buffer(Buffer: *mut c_char) -> c_int {
     let mut BufferWriter = ProfDataWriter {
         Write: None,
-        WriterCtx: ::core::ptr::null_mut::<::core::ffi::c_void>(),
+        WriterCtx: ptr::null_mut(),
     };
     initBufferWriter(&raw mut BufferWriter, Buffer);
-    lprofWriteData(
-        &raw mut BufferWriter,
-        ::core::ptr::null_mut::<VPDataReaderType>(),
-        0 as ::core::ffi::c_int,
-    )
+    lprofWriteData(&raw mut BufferWriter, ptr::null_mut(), 0)
 }
 
 #[expect(clippy::too_many_arguments)]
 pub unsafe fn __llvm_profile_write_buffer_internal(
-    Buffer: *mut ::core::ffi::c_char,
+    Buffer: *mut c_char,
     DataBegin: *const __llvm_profile_data,
     DataEnd: *const __llvm_profile_data,
-    CountersBegin: *const ::core::ffi::c_char,
-    CountersEnd: *const ::core::ffi::c_char,
-    BitmapBegin: *const ::core::ffi::c_char,
-    BitmapEnd: *const ::core::ffi::c_char,
-    NamesBegin: *const ::core::ffi::c_char,
-    NamesEnd: *const ::core::ffi::c_char,
-) -> ::core::ffi::c_int {
+    CountersBegin: *const c_char,
+    CountersEnd: *const c_char,
+    BitmapBegin: *const c_char,
+    BitmapEnd: *const c_char,
+    NamesBegin: *const c_char,
+    NamesEnd: *const c_char,
+) -> c_int {
     let mut BufferWriter = ProfDataWriter {
         Write: None,
-        WriterCtx: ::core::ptr::null_mut::<::core::ffi::c_void>(),
+        WriterCtx: ptr::null_mut(),
     };
     initBufferWriter(&raw mut BufferWriter, Buffer);
     lprofWriteDataImpl(
@@ -330,16 +301,16 @@ pub unsafe fn __llvm_profile_write_buffer_internal(
         CountersEnd,
         BitmapBegin,
         BitmapEnd,
-        ::core::ptr::null::<::core::ffi::c_char>(),
-        ::core::ptr::null::<::core::ffi::c_char>(),
-        ::core::ptr::null_mut::<VPDataReaderType>(),
+        ptr::null(),
+        ptr::null(),
+        ptr::null_mut(),
         NamesBegin,
         NamesEnd,
-        ::core::ptr::null::<VTableProfData>(),
-        ::core::ptr::null::<VTableProfData>(),
-        ::core::ptr::null::<::core::ffi::c_char>(),
-        ::core::ptr::null::<::core::ffi::c_char>(),
-        0 as ::core::ffi::c_int,
+        ptr::null(),
+        ptr::null(),
+        ptr::null(),
+        ptr::null(),
+        0,
         __llvm_profile_get_version(),
     )
 }
