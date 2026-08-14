@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
-- Upgraded the bundled LLVM runtime to raw profile format version 11.
+## v0.3.9 - 2026-08-14
+
+- Upgraded the bundled profiling runtime to LLVM 23.1 and raw profile format
+  version 11.
 
 ## v0.3.8 - 2025-12-05
 
