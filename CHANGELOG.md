@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
 
+- Upgraded the bundled LLVM runtime to raw profile format version 11.
+
 ## v0.3.8 - 2025-12-05
 
 - Fixed broken profiling on WASM. (#32)

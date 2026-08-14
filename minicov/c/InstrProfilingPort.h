@@ -12,13 +12,16 @@
 #ifndef PROFILE_INSTRPROFILING_PORT_H_
 #define PROFILE_INSTRPROFILING_PORT_H_
 
+#include <stdalign.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef _MSC_VER
 #define COMPILER_RT_ALIGNAS(x) __declspec(align(x))
 #define COMPILER_RT_VISIBILITY
 /* FIXME: selectany does not have the same semantics as weak. */
 #define COMPILER_RT_WEAK __declspec(selectany)
-/* Need to include <windows.h> */
-#define COMPILER_RT_ALLOCA _alloca
+#define COMPILER_RT_ALLOCA __builtin_alloca
 /* Need to include <stdio.h> and <io.h> */
 #define COMPILER_RT_FTRUNCATE(f,l) _chsize(_fileno(f),l)
 #define COMPILER_RT_ALWAYS_INLINE __forceinline
@@ -54,46 +57,18 @@
 #endif
 
 #define COMPILER_RT_MAX_HOSTLEN 128
-#ifdef __ORBIS__
+#if defined(__ORBIS__) || defined(__wasi__)
 #define COMPILER_RT_GETHOSTNAME(Name, Len) ((void)(Name), (void)(Len), (-1))
 #else
 #define COMPILER_RT_GETHOSTNAME(Name, Len) lprofGetHostName(Name, Len)
 #endif
 
 #if COMPILER_RT_HAS_ATOMICS == 1
-#if defined(_WIN32) && MINICOV_UEFI != 1
-#include <windows.h>
-#if defined(_MSC_VER) && _MSC_VER < 1900
-#define snprintf _snprintf
-#endif
-#if defined(_WIN64)
-#define COMPILER_RT_BOOL_CMPXCHG(Ptr, OldV, NewV)                              \
-  (InterlockedCompareExchange64((LONGLONG volatile *)Ptr, (LONGLONG)NewV,      \
-                                (LONGLONG)OldV) == (LONGLONG)OldV)
-#define COMPILER_RT_PTR_FETCH_ADD(DomType, PtrVar, PtrIncr)                    \
-  (DomType *)InterlockedExchangeAdd64((LONGLONG volatile *)&PtrVar,            \
-                                      (LONGLONG)sizeof(DomType) * PtrIncr)
-#else /* !defined(_WIN64) */
-#define COMPILER_RT_BOOL_CMPXCHG(Ptr, OldV, NewV)                              \
-  (InterlockedCompareExchange((LONG volatile *)Ptr, (LONG)NewV, (LONG)OldV) == \
-   (LONG)OldV)
-#define COMPILER_RT_PTR_FETCH_ADD(DomType, PtrVar, PtrIncr)                    \
-  (DomType *)InterlockedExchangeAdd((LONG volatile *)&PtrVar,                  \
-                                    (LONG)sizeof(DomType) * PtrIncr)
-#endif
-#else /* !defined(_WIN32) */
-
-#if MINICOV_UEFI == 1 && defined(_WIN64)
-#define COMPILER_RT_PTR_FETCH_ADD_TYPE long long
-#else
-#define COMPILER_RT_PTR_FETCH_ADD_TYPE long
-#endif
-
 #define COMPILER_RT_BOOL_CMPXCHG(Ptr, OldV, NewV)                              \
   __sync_bool_compare_and_swap(Ptr, OldV, NewV)
 #define COMPILER_RT_PTR_FETCH_ADD(DomType, PtrVar, PtrIncr)                    \
-  (DomType *)__sync_fetch_and_add((COMPILER_RT_PTR_FETCH_ADD_TYPE *)&PtrVar, sizeof(DomType) * PtrIncr)
-#endif
+  (DomType *)__sync_fetch_and_add((intptr_t *)&PtrVar,                         \
+                                  sizeof(DomType) * PtrIncr)
 #else /* COMPILER_RT_HAS_ATOMICS != 1 */
 #include "InstrProfilingUtil.h"
 #define COMPILER_RT_BOOL_CMPXCHG(Ptr, OldV, NewV)                              \
@@ -116,26 +91,15 @@
   (((ch) == DIR_SEPARATOR) || ((ch) == DIR_SEPARATOR_2))
 #endif /* DIR_SEPARATOR_2 */
 
-#if defined(_WIN32) && MINICOV_UEFI != 1
-#include <windows.h>
-static inline size_t getpagesize() {
-  SYSTEM_INFO S;
-  GetNativeSystemInfo(&S);
-  return S.dwPageSize;
-}
-#else /* defined(_WIN32) */
-#include <stddef.h>
-static inline size_t getpagesize() {
-  // MINICOV: Not used since we don't support continuous mode.
+static inline size_t getpagesize(void) {
+  /* Minicov does not support continuous mode. */
   return 1;
 }
-#endif /* defined(_WIN32) */
 
-#if 1
+#ifdef COMPILER_RT_PROFILE_BAREMETAL
+// Baremetal doesn't support logging
 #define PROF_ERR(Format, ...)
-
 #define PROF_WARN(Format, ...)
-
 #define PROF_NOTE(Format, ...)
 #else
 #define PROF_ERR(Format, ...)                                                  \
@@ -146,7 +110,7 @@ static inline size_t getpagesize() {
 
 #define PROF_NOTE(Format, ...)                                                 \
   fprintf(stderr, "LLVM Profile Note: " Format, __VA_ARGS__);
-#endif
+#endif /* COMPILER_RT_PROFILE_BAREMETAL */
 
 #ifndef MAP_FILE
 #define MAP_FILE 0
@@ -156,16 +120,13 @@ static inline size_t getpagesize() {
 #define O_BINARY 0
 #endif
 
-#include <stdint.h>
-#include <stdalign.h>
-
 #define memcmp __builtin_memcmp
 #define memset __builtin_memset
 #define memcpy __builtin_memcpy
 #define memmove __builtin_memmove
-#define assert(...)
+#define assert(...) ((void)0)
 
-void* minicov_alloc_zeroed(size_t size, size_t align);
-void minicov_dealloc(void* ptr, size_t size, size_t align);
+void *minicov_alloc_zeroed(size_t Size, size_t Alignment);
+void minicov_dealloc(void *Ptr, size_t Size, size_t Alignment);
 
 #endif /* PROFILE_INSTRPROFILING_PORT_H_ */
