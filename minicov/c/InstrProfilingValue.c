@@ -35,7 +35,7 @@ COMPILER_RT_VISIBILITY uint32_t VPMaxNumValsPerSite =
     INSTR_PROF_DEFAULT_NUM_VAL_PER_SITE;
 
 COMPILER_RT_VISIBILITY void lprofSetupValueProfiler(void) {
-#if 0
+#ifndef COMPILER_RT_PROFILE_BAREMETAL
   const char *Str = 0;
   Str = getenv("LLVM_VP_MAX_NUM_VALS_PER_SITE");
   if (Str && Str[0]) {
@@ -106,12 +106,14 @@ static int allocateValueProfileCounters(__llvm_profile_data *Data) {
 
   // If NumVSites = 0, calloc is allowed to return a non-null pointer.
   assert(NumVSites > 0 && "NumVSites can't be zero");
+  const size_t Size = NumVSites * sizeof(ValueProfNode *);
+  const size_t Alignment = alignof(ValueProfNode *);
   ValueProfNode **Mem =
-      (ValueProfNode **)minicov_alloc_zeroed(NumVSites * sizeof(ValueProfNode), alignof(ValueProfNode));
+      (ValueProfNode **)minicov_alloc_zeroed(Size, Alignment);
   if (!Mem)
     return 0;
   if (!COMPILER_RT_BOOL_CMPXCHG(&Data->Values, 0, Mem)) {
-    minicov_dealloc(Mem, NumVSites * sizeof(ValueProfNode *), alignof(ValueProfNode *));
+    minicov_dealloc(Mem, Size, Alignment);
     return 0;
   }
   return 1;
@@ -121,7 +123,8 @@ static ValueProfNode *allocateOneNode(void) {
   ValueProfNode *Node;
 
   if (!hasStaticCounters)
-    return (ValueProfNode *)minicov_alloc_zeroed(sizeof(ValueProfNode), alignof(ValueProfNode));
+    return (ValueProfNode *)minicov_alloc_zeroed(sizeof(ValueProfNode),
+                                                  alignof(ValueProfNode));
 
   /* Early check to avoid value wrapping around.  */
   if (CurrentVNode + 1 > EndVNode) {

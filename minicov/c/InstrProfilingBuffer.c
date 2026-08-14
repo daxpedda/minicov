@@ -262,5 +262,6 @@ COMPILER_RT_VISIBILITY int __llvm_profile_write_buffer_internal(
       BitmapBegin, BitmapEnd, /*UniformCountersBegin=*/NULL,
       /*UniformCountersEnd=*/NULL, /*VPDataReader=*/0, NamesBegin, NamesEnd,
       /*VTableBegin=*/NULL, /*VTableEnd=*/NULL, /*VNamesBegin=*/NULL,
-      /*VNamesEnd=*/NULL, /*SkipNameDataWrite=*/0);
+      /*VNamesEnd=*/NULL, /*SkipNameDataWrite=*/0,
+      __llvm_profile_get_version());
 }

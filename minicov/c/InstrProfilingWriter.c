@@ -9,11 +9,6 @@
 // Note: This is linked into the Darwin kernel, and must remain compatible
 // with freestanding compilation. See `darwin_add_builtin_libraries`.
 
-#ifdef _MSC_VER
-/* For _alloca */
-#include <malloc.h>
-#endif
-
 #include "InstrProfiling.h"
 #include "InstrProfilingInternal.h"
 #include "InstrProfilingPort.h"
@@ -253,25 +248,24 @@ COMPILER_RT_VISIBILITY int lprofWriteData(ProfDataWriter *Writer,
   const VTableProfData *VTableEnd = __llvm_profile_end_vtables();
   const char *VNamesBegin = __llvm_profile_begin_vtabnames();
   const char *VNamesEnd = __llvm_profile_end_vtabnames();
+  uint64_t Version = __llvm_profile_get_version();
   return lprofWriteDataImpl(Writer, DataBegin, DataEnd, CountersBegin,
                             CountersEnd, BitmapBegin, BitmapEnd,
                             /*UniformCountersBegin=*/NULL,
                             /*UniformCountersEnd=*/NULL, VPDataReader,
                             NamesBegin, NamesEnd, VTableBegin, VTableEnd,
-                            VNamesBegin, VNamesEnd, SkipNameDataWrite);
+                            VNamesBegin, VNamesEnd, SkipNameDataWrite, Version);
 }
 
-COMPILER_RT_VISIBILITY int
-lprofWriteDataImpl(ProfDataWriter *Writer, const __llvm_profile_data *DataBegin,
-                   const __llvm_profile_data *DataEnd,
-                   const char *CountersBegin, const char *CountersEnd,
-                   const char *BitmapBegin, const char *BitmapEnd,
-                   const char *UniformCountersBegin,
-                   const char *UniformCountersEnd,
-                   VPDataReaderType *VPDataReader, const char *NamesBegin,
-                   const char *NamesEnd, const VTableProfData *VTableBegin,
-                   const VTableProfData *VTableEnd, const char *VNamesBegin,
-                   const char *VNamesEnd, int SkipNameDataWrite) {
+COMPILER_RT_VISIBILITY int lprofWriteDataImpl(
+    ProfDataWriter *Writer, const __llvm_profile_data *DataBegin,
+    const __llvm_profile_data *DataEnd, const char *CountersBegin,
+    const char *CountersEnd, const char *BitmapBegin, const char *BitmapEnd,
+    const char *UniformCountersBegin, const char *UniformCountersEnd,
+    VPDataReaderType *VPDataReader, const char *NamesBegin,
+    const char *NamesEnd, const VTableProfData *VTableBegin,
+    const VTableProfData *VTableEnd, const char *VNamesBegin,
+    const char *VNamesEnd, int SkipNameDataWrite, uint64_t Version) {
   /* Calculate size of sections. */
   const uint64_t DataSectionSize =
       __llvm_profile_get_data_size(DataBegin, DataEnd);
@@ -319,6 +313,7 @@ lprofWriteDataImpl(ProfDataWriter *Writer, const __llvm_profile_data *DataBegin,
 #define INSTR_PROF_RAW_HEADER(Type, Name, Init) Header.Name = Init;
 #include "profile/InstrProfData.inc"
   }
+  Header.Version = Version;
 
   /* On WIN64, label differences are truncated 32-bit values. Truncate
    * CountersDelta to match. */
@@ -328,6 +323,9 @@ lprofWriteDataImpl(ProfDataWriter *Writer, const __llvm_profile_data *DataBegin,
   Header.UniformCountersDelta = (uint32_t)Header.UniformCountersDelta;
 #endif
 
+  /* Recompute UniformCountersDelta from file layout. The macro initializer
+     uses in-memory pointer arithmetic which is wrong when sections are in
+     separate allocations (e.g., custom profiles from device PGO). */
   if (NumUniformCounters > 0)
     Header.UniformCountersDelta = DataSectionSize + PaddingBytesBeforeCounters +
                                   CountersSectionSize +
@@ -339,6 +337,7 @@ lprofWriteDataImpl(ProfDataWriter *Writer, const __llvm_profile_data *DataBegin,
   /* The data and names sections are omitted in lightweight mode. */
   if (NumData == 0 && NamesSize == 0) {
     Header.CountersDelta = 0;
+    Header.BitmapDelta = 0;
     Header.NamesDelta = 0;
     Header.UniformCountersDelta = 0;
   }
